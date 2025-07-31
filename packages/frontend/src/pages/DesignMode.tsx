@@ -93,7 +93,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
   const [draggedComponentType, setDraggedComponentType] = useState<string | null>(null)
   
   const [variables, setVariables] = useState<Variable[]>([])
-  const [activeTab, setActiveTab] = useState<'library' | 'layers' | 'screens'>('library')
+  const [activeTab, setActiveTab] = useState<'file' | 'assets'>('file')
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
@@ -2551,19 +2551,19 @@ export function DesignMode({ projectId }: DesignModeProps) {
     <div className="h-screen flex bg-gray-50 font-['Inter'] font-semibold">
       {/* Left Panel - Library & Layers & Variables & Screens */}
       {sidebarVisible && (
-        <div className="w-64 bg-gray-900 text-white flex flex-col">
+        <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
           {/* Top Section - Project Name & Tabs */}
-          <div className="p-4 border-b border-gray-700">
+          <div className="p-4 border-b border-gray-200">
             {/* Project Name */}
             <div className="flex items-center space-x-2 mb-3">
               <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                <span className="text-xs font-bold">C</span>
+                <span className="text-xs font-bold text-white">C</span>
               </div>
               <div className="flex-1">
-                <div className="text-sm font-medium">Untitled</div>
-                <div className="text-xs text-gray-400">Drafts</div>
+                <div className="text-sm font-medium text-gray-900">Untitled</div>
+                <div className="text-xs text-gray-500">Drafts</div>
               </div>
-              <button className="text-gray-400 hover:text-white">
+              <button className="text-gray-400 hover:text-gray-600">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -2571,11 +2571,25 @@ export function DesignMode({ projectId }: DesignModeProps) {
             </div>
             
             {/* File/Assets Tabs */}
-            <div className="flex bg-gray-800 rounded-lg p-1">
-              <button className="flex-1 text-xs py-2 px-3 bg-blue-600 text-white rounded-md">
+            <div className="flex bg-gray-100 rounded-lg p-1">
+              <button 
+                onClick={() => setActiveTab('file')}
+                className={`flex-1 text-xs py-2 px-3 rounded-md transition-colors ${
+                  activeTab === 'file' 
+                    ? 'bg-white text-gray-900 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
                 File
               </button>
-              <button className="flex-1 text-xs py-2 px-3 text-gray-400 hover:text-white">
+              <button 
+                onClick={() => setActiveTab('assets')}
+                className={`flex-1 text-xs py-2 px-3 rounded-md transition-colors ${
+                  activeTab === 'assets' 
+                    ? 'bg-white text-gray-900 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
                 Assets
               </button>
             </div>
@@ -2583,7 +2597,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
             {/* Back to Dashboard Button */}
             <button
               onClick={() => navigate('/user-dashboard')}
-              className="mt-3 w-full px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs font-medium rounded-lg flex items-center justify-center space-x-2 transition-colors"
+              className="mt-3 w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg flex items-center justify-center space-x-2 transition-colors"
             >
               <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -2592,211 +2606,462 @@ export function DesignMode({ projectId }: DesignModeProps) {
             </button>
           </div>
 
-          {/* Screens Section */}
+          {/* Content Area */}
           <div className="flex-1 overflow-y-auto">
-            <div className="p-4 border-b border-gray-700">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Screens</h3>
-                <button 
-                  onClick={() => createScreenWithPosition({
-                    name: `Screen ${screens.length + 1}`,
-                    width: 1200,
-                    height: 800,
-                    type: 'custom'
-                  })}
-                  className="text-gray-400 hover:text-white"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="space-y-2">
-                {screens.length === 0 ? (
-                  <div className="text-center py-6 text-gray-400">
-                    <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-xs">No screens yet</p>
-                    <p className="text-xs text-gray-500">Add a screen to get started</p>
+            {activeTab === 'file' && (
+              <>
+                {/* Screens Section */}
+                <div className="p-4 border-b border-gray-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium text-gray-900">Screens</h3>
+                    <button 
+                      onClick={() => createScreenWithPosition({
+                        name: `Screen ${screens.length + 1}`,
+                        width: 1200,
+                        height: 800,
+                        type: 'custom'
+                      })}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </button>
                   </div>
-                ) : (
-                  screens.map((screen, index) => {
-                    const { defaultX, defaultY } = calculateScreenPosition(index, screen)
-                    const currentPosition = screenPositions[screen.id] || { x: 0, y: 0 }
-                    const actualX = currentPosition.x + defaultX
-                    const actualY = currentPosition.y + defaultY
-                    
-                    // Calculate thumbnail dimensions maintaining aspect ratio
-                    const maxThumbnailWidth = 200
-                    const maxThumbnailHeight = 120
-                    const aspectRatio = screen.width / screen.height
-                    
-                    let thumbnailWidth = maxThumbnailWidth
-                    let thumbnailHeight = maxThumbnailWidth / aspectRatio
-                    
-                    if (thumbnailHeight > maxThumbnailHeight) {
-                      thumbnailHeight = maxThumbnailHeight
-                      thumbnailWidth = maxThumbnailHeight * aspectRatio
-                    }
-                    
-                    return (
-                      <div
-                        key={screen.id}
-                        className={`group relative bg-gray-800 rounded-lg p-2 cursor-pointer transition-all duration-200 ${
-                          activeScreen === screen.id 
-                            ? 'ring-2 ring-blue-500 bg-gray-700' 
-                            : 'hover:bg-gray-700'
-                        }`}
-                        onClick={() => setActiveScreen(screen.id)}
-                        onDoubleClick={() => {
-                          // Navigate to the screen on canvas
-                          const canvasContainer = document.querySelector('.flex-1.bg-gray-100.overflow-hidden.relative') as HTMLElement
-                          if (canvasContainer) {
-                            const canvasRect = canvasContainer.getBoundingClientRect()
-                            const containerWidth = canvasRect.width
-                            const containerHeight = canvasRect.height
+                  
+                  <div className="space-y-2">
+                    {screens.length === 0 ? (
+                      <div className="text-center py-6 text-gray-400">
+                        <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        <p className="text-xs">No screens yet</p>
+                        <p className="text-xs text-gray-500">Add a screen to get started</p>
+                      </div>
+                    ) : (
+                      screens.map((screen, index) => {
+                        const { defaultX, defaultY } = calculateScreenPosition(index, screen)
+                        const currentPosition = screenPositions[screen.id] || { x: 0, y: 0 }
+                        const actualX = currentPosition.x + defaultX
+                        const actualY = currentPosition.y + defaultY
+                        
+                        // Calculate thumbnail dimensions maintaining aspect ratio
+                        const maxThumbnailWidth = 200
+                        const maxThumbnailHeight = 120
+                        const aspectRatio = screen.width / screen.height
+                        
+                        let thumbnailWidth = maxThumbnailWidth
+                        let thumbnailHeight = maxThumbnailWidth / aspectRatio
+                        
+                        if (thumbnailHeight > maxThumbnailHeight) {
+                          thumbnailHeight = maxThumbnailHeight
+                          thumbnailWidth = maxThumbnailHeight * aspectRatio
+                        }
+                        
+                        return (
+                          <div
+                            key={screen.id}
+                            className={`group relative bg-white border rounded-lg p-2 cursor-pointer transition-all duration-200 ${
+                              activeScreen === screen.id 
+                                ? 'ring-2 ring-blue-500 border-blue-300 bg-blue-50' 
+                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            }`}
+                            onClick={() => setActiveScreen(screen.id)}
+                            onDoubleClick={() => {
+                              // Navigate to the screen on canvas
+                              const canvasContainer = document.querySelector('.flex-1.bg-gray-100.overflow-hidden.relative') as HTMLElement
+                              if (canvasContainer) {
+                                const canvasRect = canvasContainer.getBoundingClientRect()
+                                const containerWidth = canvasRect.width
+                                const containerHeight = canvasRect.height
+                                
+                                const centerX = actualX + screen.width / 2
+                                const centerY = actualY + screen.height / 2
+                                
+                                const newPanX = containerWidth / 2 - centerX
+                                const newPanY = containerHeight / 2 - centerY
+                                
+                                setPan({ x: newPanX, y: newPanY })
+                                setZoom(1)
+                              }
+                            }}
+                          >
+                            {/* Screen Thumbnail */}
+                            <div 
+                              className="bg-white rounded border border-gray-300 mb-2 overflow-hidden"
+                              style={{
+                                width: `${thumbnailWidth}px`,
+                                height: `${thumbnailHeight}px`
+                              }}
+                            >
+                              {/* Mini preview of screen content */}
+                              <div className="w-full h-full bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+                                <div className="text-xs text-gray-500">{screen.width}×{screen.height}</div>
+                              </div>
+                            </div>
                             
-                            const centerX = actualX + screen.width / 2
-                            const centerY = actualY + screen.height / 2
+                            {/* Screen Name */}
+                            <div className="text-xs font-medium text-gray-900 truncate">
+                              {screen.name}
+                            </div>
                             
-                            const newPanX = containerWidth / 2 - centerX
-                            const newPanY = containerHeight / 2 - centerY
+                            {/* Screen Type Badge */}
+                            <div className="text-xs text-gray-500 capitalize">
+                              {screen.type}
+                            </div>
                             
-                            setPan({ x: newPanX, y: newPanY })
-                            setZoom(1)
-                          }
-                        }}
-                      >
-                        {/* Screen Thumbnail */}
-                        <div 
-                          className="bg-white rounded border border-gray-600 mb-2 overflow-hidden"
-                          style={{
-                            width: `${thumbnailWidth}px`,
-                            height: `${thumbnailHeight}px`
-                          }}
-                        >
-                          {/* Mini preview of screen content */}
-                          <div className="w-full h-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                            <div className="text-xs text-gray-500">{screen.width}×{screen.height}</div>
+                            {/* Delete Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                if (screens.length <= 1) {
+                                  alert('Cannot delete the last screen')
+                                  return
+                                }
+                                if (window.confirm(`Delete "${screen.name}"?`)) {
+                                  deleteActiveScreen()
+                                }
+                              }}
+                              className={`absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity ${
+                                screens.length <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-500'
+                              }`}
+                              disabled={screens.length <= 1}
+                            >
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
                           </div>
-                        </div>
-                        
-                        {/* Screen Name */}
-                        <div className="text-xs font-medium text-gray-200 truncate">
-                          {screen.name}
-                        </div>
-                        
-                        {/* Screen Type Badge */}
-                        <div className="text-xs text-gray-400 capitalize">
-                          {screen.type}
-                        </div>
-                        
-                        {/* Delete Button */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (screens.length <= 1) {
-                              alert('Cannot delete the last screen')
-                              return
-                            }
-                            if (window.confirm(`Delete "${screen.name}"?`)) {
-                              deleteActiveScreen()
-                            }
-                          }}
-                          className={`absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity ${
-                            screens.length <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-400'
-                          }`}
-                          disabled={screens.length <= 1}
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    )
-                  })
-                )}
-              </div>
-            </div>
+                        )
+                      })
+                    )}
+                  </div>
+                </div>
 
-            {/* Layers Section */}
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Layers</h3>
-                <button className="text-gray-400 hover:text-white">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                  </svg>
-                </button>
-              </div>
-              
-              <div className="space-y-1">
-                {activeScreen && screens.find(s => s.id === activeScreen)?.layers.map((layer) => (
-                  <div key={layer.id} className="group">
-                    {/* Layer Header */}
-                    <div className="flex items-center space-x-2 py-1 px-2 rounded hover:bg-gray-700">
-                      <button className="text-gray-400 hover:text-white">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-                      <div className="w-4 h-4 bg-gray-600 rounded flex items-center justify-center">
-                        <svg className="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                        </svg>
-                      </div>
-                      <span className="text-xs text-gray-200 flex-1 text-left">{layer.name}</span>
-                      <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100">
-                        <button className="text-gray-400 hover:text-white">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                          </svg>
-                        </button>
-                        <button className="text-gray-400 hover:text-white">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Components in Layer */}
-                    <div className="ml-6 space-y-1">
-                      {layer.components.map((component) => (
-                        <div 
-                          key={component.id}
-                          className={`flex items-center space-x-2 py-1 px-2 rounded text-xs ${
-                            selectedComponent?.id === component.id 
-                              ? 'bg-blue-600 text-white' 
-                              : 'text-gray-300 hover:bg-gray-700'
-                          }`}
-                          onClick={() => setSelectedComponent(component)}
-                        >
-                          <div className="w-3 h-3 bg-gray-500 rounded"></div>
-                          <span className="flex-1 truncate">{component.type}</span>
+                {/* Layers Section */}
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium text-gray-900">Layers</h3>
+                    <button className="text-gray-400 hover:text-gray-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                      </svg>
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    {activeScreen && screens.find(s => s.id === activeScreen)?.layers.map((layer) => (
+                      <div key={layer.id} className="group">
+                        {/* Layer Header */}
+                        <div className="flex items-center space-x-2 py-1 px-2 rounded hover:bg-gray-100">
+                          <button className="text-gray-400 hover:text-gray-600">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          <div className="w-4 h-4 bg-gray-300 rounded flex items-center justify-center">
+                            <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                          </div>
+                          <span className="text-xs text-gray-700 flex-1 text-left">{layer.name}</span>
                           <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100">
-                            <button className="text-gray-400 hover:text-white">
+                            <button className="text-gray-400 hover:text-gray-600">
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                               </svg>
                             </button>
-                            <button className="text-gray-400 hover:text-white">
+                            <button className="text-gray-400 hover:text-gray-600">
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                               </svg>
                             </button>
                           </div>
                         </div>
-                      ))}
+                        
+                        {/* Components in Layer */}
+                        <div className="ml-6 space-y-1">
+                          {layer.components.map((component) => (
+                            <div 
+                              key={component.id}
+                              className={`flex items-center space-x-2 py-1 px-2 rounded text-xs ${
+                                selectedComponent?.id === component.id 
+                                  ? 'bg-blue-100 text-blue-900' 
+                                  : 'text-gray-600 hover:bg-gray-100'
+                              }`}
+                              onClick={() => setSelectedComponent(component)}
+                            >
+                              <div className="w-3 h-3 bg-gray-400 rounded"></div>
+                              <span className="flex-1 truncate">{component.type}</span>
+                              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100">
+                                <button className="text-gray-400 hover:text-gray-600">
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                  </svg>
+                                </button>
+                                <button className="text-gray-400 hover:text-gray-600">
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'assets' && (
+              <div className="p-4 space-y-6">
+                {/* UI Components Section */}
+                <div>
+                  <div className="mb-4 cursor-pointer hover:bg-gray-50 p-3 rounded-xl transition-all duration-200 border border-transparent hover:border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                          <Layout className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                          <h3 className="text-base font-bold text-gray-900">UI Components</h3>
+                          <p className="text-sm text-gray-500">Essential building blocks</p>
+                        </div>
+                      </div>
+                      <ChevronDown 
+                        className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${
+                          sidebarStates.library ? 'rotate-0' : '-rotate-90'
+                        }`}
+                      />
                     </div>
                   </div>
-                ))}
+                  
+                  {sidebarStates.library && (
+                    <div className="space-y-4">
+                      {/* Basic Elements */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3 px-1">Basic Elements</h4>
+                        <div className="grid grid-cols-1 gap-2">
+                          {componentLibrary.slice(0, 6).map((component) => (
+                            <button
+                              key={component.type}
+                              onClick={() => addComponentToCanvas(component.type)}
+                              draggable
+                              onDragStart={(e) => handleLibraryDragStart(e, component.type)}
+                              onDragEnd={handleLibraryDragEnd}
+                              className="group relative bg-white border border-gray-200 rounded-lg p-2 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100 transition-all duration-200 cursor-grab active:cursor-grabbing"
+                            >
+                              {/* Component Preview */}
+                              <div className="w-full h-12 mb-2 rounded border border-gray-100 overflow-hidden bg-gradient-to-br from-gray-50 to-white shadow-sm">
+                                {renderComponentPreview(component.type)}
+                              </div>
+                              
+                              {/* Component Info */}
+                              <div className="flex items-center space-x-2">
+                                <div className="w-6 h-6 bg-gray-100 rounded-md flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                                  <component.icon className="h-3 w-3 text-gray-600 group-hover:text-blue-600" />
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">{component.name}</span>
+                              </div>
+                              
+                              {/* Hover Effect */}
+                              <div className="absolute inset-0 bg-blue-500 bg-opacity-0 group-hover:bg-opacity-5 rounded-xl transition-all duration-200 pointer-events-none" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Advanced Components */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3 px-1">Advanced Components</h4>
+                        <div className="grid grid-cols-1 gap-2">
+                          {componentLibrary.slice(6, 12).map((component) => (
+                            <button
+                              key={component.type}
+                              onClick={() => addComponentToCanvas(component.type)}
+                              draggable
+                              onDragStart={(e) => handleLibraryDragStart(e, component.type)}
+                              onDragEnd={handleLibraryDragEnd}
+                              className="group relative bg-white border border-gray-200 rounded-lg p-2 hover:border-purple-300 hover:shadow-md hover:shadow-purple-100 transition-all duration-200 cursor-grab active:cursor-grabbing"
+                            >
+                              {/* Component Preview */}
+                              <div className="w-full h-12 mb-2 rounded border border-gray-100 overflow-hidden bg-gradient-to-br from-gray-50 to-white shadow-sm">
+                                {renderComponentPreview(component.type)}
+                              </div>
+                              
+                              {/* Component Info */}
+                              <div className="flex items-center space-x-2">
+                                <div className="w-6 h-6 bg-gray-100 rounded-md flex items-center justify-center group-hover:bg-purple-100 transition-colors">
+                                  <component.icon className="h-3 w-3 text-gray-600 group-hover:text-purple-600" />
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 group-hover:text-purple-700">{component.name}</span>
+                              </div>
+                              
+                              {/* Hover Effect */}
+                              <div className="absolute inset-0 bg-purple-500 bg-opacity-0 group-hover:bg-opacity-5 rounded-xl transition-all duration-200 pointer-events-none" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Interactive Elements */}
+                      <div>
+                        <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3 px-1">Interactive Elements</h4>
+                        <div className="grid grid-cols-1 gap-2">
+                          {componentLibrary.slice(12).map((component) => (
+                            <button
+                              key={component.type}
+                              onClick={() => addComponentToCanvas(component.type)}
+                              draggable
+                              onDragStart={(e) => handleLibraryDragStart(e, component.type)}
+                              onDragEnd={handleLibraryDragEnd}
+                              className="group relative bg-white border border-gray-200 rounded-lg p-2 hover:border-green-300 hover:shadow-md hover:shadow-green-100 transition-all duration-200 cursor-grab active:cursor-grabbing"
+                            >
+                              {/* Component Preview */}
+                              <div className="w-full h-12 mb-2 rounded border border-gray-100 overflow-hidden bg-gradient-to-br from-gray-50 to-white shadow-sm">
+                                {renderComponentPreview(component.type)}
+                              </div>
+                              
+                              {/* Component Info */}
+                              <div className="flex items-center space-x-2">
+                                <div className="w-6 h-6 bg-gray-100 rounded-md flex items-center justify-center group-hover:bg-green-100 transition-colors">
+                                  <component.icon className="h-3 w-3 text-gray-600 group-hover:text-green-600" />
+                                </div>
+                                <span className="text-sm font-medium text-gray-700 group-hover:text-green-700">{component.name}</span>
+                              </div>
+                              
+                              {/* Hover Effect */}
+                              <div className="absolute inset-0 bg-green-500 bg-opacity-0 group-hover:bg-opacity-5 rounded-xl transition-all duration-200 pointer-events-none" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Pre-built Pages Section */}
+                <div>
+                  <div className="mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-base font-semibold text-gray-900 mb-1">Pre-built Pages</h3>
+                        <p className="text-sm text-gray-500">Complete page templates with functionality</p>
+                      </div>
+                      <ChevronDown 
+                        className={`h-5 w-5 text-gray-400 transition-transform ${
+                          sidebarStates.screens ? 'rotate-0' : '-rotate-90'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                  
+                  {sidebarStates.screens && (
+                    <div className="space-y-3">
+                      {/* Login Page */}
+                      <button 
+                        onClick={addLoginPage}
+                        className="w-full text-left bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors duration-200"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                              <span className="text-blue-600 text-sm">🔐</span>
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-900">Login Page</h4>
+                              <p className="text-xs text-gray-500">Authentication form with validation</p>
+                            </div>
+                          </div>
+                          <div className="text-xs text-blue-600 font-medium">Add</div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Form</span>
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Data Binding</span>
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">API</span>
+                        </div>
+                      </button>
+
+                      {/* Dashboard Page */}
+                      <button 
+                        onClick={addDashboardPage}
+                        className="w-full text-left bg-white border border-gray-200 rounded-lg p-4 hover:border-green-300 hover:bg-green-50 transition-colors duration-200"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                              <span className="text-green-600 text-sm">📊</span>
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-900">Dashboard</h4>
+                              <p className="text-xs text-gray-500">Analytics with charts and metrics</p>
+                            </div>
+                          </div>
+                          <div className="text-xs text-green-600 font-medium">Add</div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Charts</span>
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Data</span>
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Actions</span>
+                        </div>
+                      </button>
+
+                      {/* Profile Page */}
+                      <button 
+                        onClick={addProfilePage}
+                        className="w-full text-left bg-white border border-gray-200 rounded-lg p-4 hover:border-purple-300 hover:bg-purple-50 transition-colors duration-200"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                              <span className="text-purple-600 text-sm">👤</span>
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-900">Profile Page</h4>
+                              <p className="text-xs text-gray-500">User profile with settings</p>
+                            </div>
+                          </div>
+                          <div className="text-xs text-purple-600 font-medium">Add</div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Profile</span>
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Settings</span>
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Avatar</span>
+                        </div>
+                      </button>
+
+                      {/* E-commerce Page */}
+                      <button 
+                        onClick={addEcommercePage}
+                        className="w-full text-left bg-white border border-gray-200 rounded-lg p-4 hover:border-orange-300 hover:bg-orange-50 transition-colors duration-200"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                              <span className="text-orange-600 text-sm">🛒</span>
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-semibold text-gray-900">E-commerce</h4>
+                              <p className="text-xs text-gray-500">Product catalog with cart</p>
+                            </div>
+                          </div>
+                          <div className="text-xs text-orange-600 font-medium">Add</div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Products</span>
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Cart</span>
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Checkout</span>
+                        </div>
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
