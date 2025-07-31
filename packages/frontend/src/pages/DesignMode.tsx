@@ -2614,19 +2614,63 @@ export function DesignMode({ projectId }: DesignModeProps) {
                 <div className="p-4 border-b border-gray-200">
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-sm font-medium text-gray-900">Screens</h3>
-                    <button 
-                      onClick={() => createScreenWithPosition({
-                        name: `Screen ${screens.length + 1}`,
-                        width: 1200,
-                        height: 800,
-                        type: 'custom'
-                      })}
-                      className="text-gray-400 hover:text-gray-600"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                    </button>
+                    <div className="relative">
+                      <button 
+                        onClick={() => setShowScreenSelector(!showScreenSelector)}
+                        className="text-gray-400 hover:text-gray-600 p-1 rounded"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                      </button>
+                      
+                      {/* Screen Type Selector Dropdown */}
+                      {showScreenSelector && (
+                        <div className="absolute right-0 top-8 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                          <div className="p-2">
+                            <div className="text-xs font-medium text-gray-700 mb-2 px-2">Choose Screen Type</div>
+                            
+                            {/* Custom Screen */}
+                            <button
+                              onClick={() => {
+                                createScreenWithPosition({
+                                  name: `Screen ${screens.length + 1}`,
+                                  width: 1200,
+                                  height: 800,
+                                  type: 'custom'
+                                })
+                                setShowScreenSelector(false)
+                              }}
+                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center space-x-2"
+                            >
+                              <div className="w-4 h-4 bg-gray-200 rounded"></div>
+                              <span>Custom Screen</span>
+                            </button>
+                            
+                            {/* Preset Screens */}
+                            {screenPresets.map((preset) => (
+                              <button
+                                key={preset.name}
+                                onClick={() => {
+                                  createScreenWithPosition({
+                                    name: preset.name,
+                                    width: preset.width,
+                                    height: preset.height,
+                                    type: preset.type
+                                  })
+                                  setShowScreenSelector(false)
+                                }}
+                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center space-x-2"
+                              >
+                                <preset.icon className="w-4 h-4 text-gray-500" />
+                                <span>{preset.name}</span>
+                                <span className="text-xs text-gray-400 ml-auto">{preset.width}×{preset.height}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   
                   <div className="space-y-2">
@@ -2645,23 +2689,10 @@ export function DesignMode({ projectId }: DesignModeProps) {
                         const actualX = currentPosition.x + defaultX
                         const actualY = currentPosition.y + defaultY
                         
-                        // Calculate thumbnail dimensions maintaining aspect ratio
-                        const maxThumbnailWidth = 200
-                        const maxThumbnailHeight = 120
-                        const aspectRatio = screen.width / screen.height
-                        
-                        let thumbnailWidth = maxThumbnailWidth
-                        let thumbnailHeight = maxThumbnailWidth / aspectRatio
-                        
-                        if (thumbnailHeight > maxThumbnailHeight) {
-                          thumbnailHeight = maxThumbnailHeight
-                          thumbnailWidth = maxThumbnailHeight * aspectRatio
-                        }
-                        
                         return (
                           <div
                             key={screen.id}
-                            className={`group relative bg-white border rounded-lg p-2 cursor-pointer transition-all duration-200 ${
+                            className={`group relative bg-white border rounded-lg p-3 cursor-pointer transition-all duration-200 ${
                               activeScreen === screen.id 
                                 ? 'ring-2 ring-blue-500 border-blue-300 bg-blue-50' 
                                 : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
@@ -2686,51 +2717,105 @@ export function DesignMode({ projectId }: DesignModeProps) {
                               }
                             }}
                           >
-                            {/* Screen Thumbnail */}
-                            <div 
-                              className="bg-white rounded border border-gray-300 mb-2 overflow-hidden"
-                              style={{
-                                width: `${thumbnailWidth}px`,
-                                height: `${thumbnailHeight}px`
-                              }}
-                            >
-                              {/* Mini preview of screen content */}
-                              <div className="w-full h-full bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-                                <div className="text-xs text-gray-500">{screen.width}×{screen.height}</div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                {/* Screen Name with Inline Editing */}
+                                <div className="flex items-center space-x-2">
+                                  <div className="flex-1 min-w-0">
+                                    <input
+                                      type="text"
+                                      value={screen.name}
+                                      onChange={(e) => updateScreen(screen.id, { name: e.target.value })}
+                                      className={`w-full text-sm font-medium bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white px-2 py-1 rounded min-w-0 ${
+                                        activeScreen === screen.id ? 'text-blue-700' : 'text-gray-700'
+                                      }`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      onDoubleClick={(e) => e.stopPropagation()}
+                                    />
+                                  </div>
+                                  
+                                  {/* Screen Type Badge */}
+                                  <span className={`px-2 py-1 text-xs rounded-full capitalize ${
+                                    screen.type === 'mobile' ? 'bg-blue-100 text-blue-700' :
+                                    screen.type === 'tablet' ? 'bg-green-100 text-green-700' :
+                                    screen.type === 'desktop' ? 'bg-purple-100 text-purple-700' :
+                                    'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {screen.type}
+                                  </span>
+                                  
+                                  {/* Screen Dimensions */}
+                                  <span className="text-xs text-gray-500">
+                                    {screen.width}×{screen.height}
+                                  </span>
+                                </div>
+                                
+                                {/* Tags Section */}
+                                <div className="flex items-center space-x-1 mt-1">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      const tag = prompt('Enter a tag for this screen:')
+                                      if (tag && tag.trim()) {
+                                        // Add tag functionality here
+                                        console.log('Adding tag:', tag, 'to screen:', screen.id)
+                                      }
+                                    }}
+                                    className="text-xs text-gray-400 hover:text-gray-600 flex items-center space-x-1"
+                                  >
+                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                                    </svg>
+                                    <span>Add Tag</span>
+                                  </button>
+                                </div>
+                              </div>
+                              
+                              {/* Action Buttons */}
+                              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {/* Edit Button */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    // Focus on the name input
+                                    const input = e.currentTarget.parentElement?.parentElement?.querySelector('input')
+                                    if (input) {
+                                      input.focus()
+                                      input.select()
+                                    }
+                                  }}
+                                  className="text-gray-400 hover:text-gray-600 p-1"
+                                  title="Edit screen name"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                  </svg>
+                                </button>
+                                
+                                {/* Delete Button */}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    if (screens.length <= 1) {
+                                      alert('Cannot delete the last screen')
+                                      return
+                                    }
+                                    if (window.confirm(`Delete "${screen.name}"?`)) {
+                                      deleteActiveScreen()
+                                    }
+                                  }}
+                                  className={`text-gray-400 hover:text-red-500 p-1 ${
+                                    screens.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''
+                                  }`}
+                                  disabled={screens.length <= 1}
+                                  title={screens.length <= 1 ? 'Cannot delete the last screen' : 'Delete screen'}
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
                               </div>
                             </div>
-                            
-                            {/* Screen Name */}
-                            <div className="text-xs font-medium text-gray-900 truncate">
-                              {screen.name}
-                            </div>
-                            
-                            {/* Screen Type Badge */}
-                            <div className="text-xs text-gray-500 capitalize">
-                              {screen.type}
-                            </div>
-                            
-                            {/* Delete Button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                if (screens.length <= 1) {
-                                  alert('Cannot delete the last screen')
-                                  return
-                                }
-                                if (window.confirm(`Delete "${screen.name}"?`)) {
-                                  deleteActiveScreen()
-                                }
-                              }}
-                              className={`absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity ${
-                                screens.length <= 1 ? 'opacity-50 cursor-not-allowed' : 'hover:text-red-500'
-                              }`}
-                              disabled={screens.length <= 1}
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                            </button>
                           </div>
                         )
                       })
