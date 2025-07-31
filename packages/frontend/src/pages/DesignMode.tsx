@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigation } from '@/contexts/NavigationContext'
 import { useDesign, Component } from '@/contexts/DesignContext'
 import { useNavigate } from 'react-router-dom'
+import { ProjectService } from '@/services/projectService'
+import { useAuth } from '@/hooks/useAuth'
 import { 
   Layout, 
   Palette, 
@@ -133,6 +135,100 @@ export function DesignMode({ projectId }: DesignModeProps) {
       console.log('Properties panel synced with component:', selectedComponentData)
     }
   }, [selectedComponentData])
+
+  // Save project data functionality
+  const saveProjectData = useCallback(async () => {
+    if (!projectId) {
+      console.warn('No project ID available for saving')
+      return
+    }
+
+    try {
+      const designData = {
+        screens,
+        activeScreen,
+        variables,
+        zoom,
+        pan,
+        sidebarStates,
+        screenPositions
+      }
+
+      await ProjectService.saveProjectData(projectId, 'design', designData)
+      console.log('Project design data saved successfully')
+    } catch (error) {
+      console.error('Error saving project data:', error)
+    }
+  }, [projectId, screens, activeScreen, variables, zoom, pan, sidebarStates, screenPositions])
+
+  // Load project data functionality
+  const loadProjectData = useCallback(async () => {
+    if (!projectId) {
+      console.warn('No project ID available for loading')
+      return
+    }
+
+    try {
+      const designData = await ProjectService.getProjectData(projectId, 'design')
+      
+      if (designData && designData.data) {
+        const { screens: savedScreens, activeScreen: savedActiveScreen, variables: savedVariables, zoom: savedZoom, pan: savedPan, sidebarStates: savedSidebarStates, screenPositions: savedScreenPositions } = designData.data
+        
+        // Restore design state
+        if (savedScreens) {
+          savedScreens.forEach((screen: Screen) => {
+            addScreen(screen)
+          })
+        }
+        
+        if (savedActiveScreen) {
+          setActiveScreen(savedActiveScreen)
+        }
+        
+        if (savedVariables) {
+          setVariables(savedVariables)
+        }
+        
+        if (savedZoom) {
+          setZoom(savedZoom)
+        }
+        
+        if (savedPan) {
+          setPan(savedPan)
+        }
+        
+        if (savedSidebarStates) {
+          setSidebarStates(savedSidebarStates)
+        }
+        
+        if (savedScreenPositions) {
+          setScreenPositions(savedScreenPositions)
+        }
+        
+        console.log('Project design data loaded successfully')
+      }
+    } catch (error) {
+      console.error('Error loading project data:', error)
+    }
+  }, [projectId, addScreen, setActiveScreen])
+
+  // Auto-save functionality
+  useEffect(() => {
+    if (projectId) {
+      const autoSaveInterval = setInterval(() => {
+        saveProjectData()
+      }, 30000) // Auto-save every 30 seconds
+
+      return () => clearInterval(autoSaveInterval)
+    }
+  }, [projectId, saveProjectData])
+
+  // Load project data on mount
+  useEffect(() => {
+    if (projectId) {
+      loadProjectData()
+    }
+  }, [projectId, loadProjectData])
 
   // Local update function that ensures proper synchronization
   const updateComponentLocal = (componentId: string, updates: Partial<Component>) => {

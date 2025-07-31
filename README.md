@@ -80,7 +80,7 @@ CTRL_mvp/
 
 - Node.js 18+ 
 - npm or yarn
-- MongoDB (optional for development)
+- PostgreSQL (for Supabase database)
 
 ### Installation
 
@@ -95,13 +95,22 @@ CTRL_mvp/
    npm run install:all
    ```
 
-3. **Set up environment variables**
+3. **Set up the database**
+   ```bash
+   # Update database credentials in setup-database.sh
+   # Then run the setup script
+   ./setup-database.sh
+   ```
+   
+   For detailed database setup instructions, see [DATABASE_SETUP.md](./DATABASE_SETUP.md)
+
+4. **Set up environment variables**
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
-4. **Start development servers**
+5. **Start development servers**
    ```bash
    npm run dev
    ```
@@ -135,7 +144,7 @@ Create a `.env` file in the root directory with the following variables:
 
 ```env
 # Server Configuration
-PORT=5000
+PORT=5001
 NODE_ENV=development
 
 # Frontend URL
@@ -144,11 +153,30 @@ FRONTEND_URL=http://localhost:3000
 # AI Configuration
 OPENAI_API_KEY=your_openai_api_key_here
 
-# Database Configuration
-MONGODB_URI=mongodb://localhost:27017/ctrl_mvp
+# Database Configuration (Supabase)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_supabase_anon_key
 
 # JWT Configuration
 JWT_SECRET=your_jwt_secret_here
+JWT_EXPIRES_IN=7d
+
+# File Upload Configuration
+MAX_FILE_SIZE=10485760
+UPLOAD_PATH=./uploads
+
+# Email Configuration (optional)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_email_password
+
+# Redis Configuration (optional)
+REDIS_URL=redis://localhost:6379
+
+# Logging Configuration
+LOG_LEVEL=info
+LOG_FILE=./logs/app.log
 ```
 
 ### AI Integration
@@ -159,7 +187,28 @@ To enable AI features, you'll need an OpenAI API key:
 2. Get your API key from the dashboard
 3. Add it to your `.env` file as `OPENAI_API_KEY`
 
-## 📱 Features Overview
+## 🔒 User Isolation & Database Features
+
+### Complete User Separation
+- **Individual Database Spaces**: Each user has their own isolated database space
+- **Row Level Security (RLS)**: Automatic data isolation based on user authentication
+- **Project Persistence**: All project data is automatically saved and loaded per user
+- **Real-time Auto-save**: Design changes are saved every 30 seconds
+
+### Database Schema
+- **`projects`**: Main project metadata with user association
+- **`project_data`**: Design, logic, and code data storage
+- **`user_settings`**: User preferences and configuration
+- **Automatic Timestamps**: Created/updated timestamps managed by triggers
+- **Performance Indexes**: Optimized queries for fast data retrieval
+
+### Security Features
+- **Authentication Required**: All database operations require user authentication
+- **Policy-based Access**: Users can only access their own data
+- **Automatic User Association**: New projects are automatically linked to the authenticated user
+- **Data Integrity**: Foreign key constraints and cascading deletes
+
+## �� Features Overview
 
 ### AI Assistant
 - Real-time chat interface

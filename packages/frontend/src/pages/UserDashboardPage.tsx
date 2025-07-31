@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../supabaseClient'
 import { useAuth } from '../hooks/useAuth'
 import { CreateProjectModal } from '../components/CreateProjectModal'
+import { ProjectService, Project } from '../services/projectService'
 import { 
   Plus, 
   Edit, 
@@ -28,16 +28,38 @@ const DEVICES = ['Phone', 'Tablet', 'Desktop', 'Web']
 
 export function UserDashboardPage() {
   const { user } = useAuth()
-  const [projects, setProjects] = useState([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [editId, setEditId] = useState(null)
+  const [editId, setEditId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
   const [editLanguage, setEditLanguage] = useState(LANGUAGES[0])
   const [editDevice, setEditDevice] = useState(DEVICES[0])
   const [activeTab, setActiveTab] = useState('dashboard') // 'dashboard' or 'projects'
   const navigate = useNavigate()
+
+  // Load user's projects on component mount
+  useEffect(() => {
+    if (user) {
+      loadUserProjects()
+    }
+  }, [user])
+
+  const loadUserProjects = async () => {
+    setLoading(true)
+    setError('')
+    
+    try {
+      const userProjects = await ProjectService.getUserProjects()
+      setProjects(userProjects)
+    } catch (err) {
+      console.error('Error loading projects:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load projects')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   // Calculate analytics from real project data
   const calculateAnalytics = () => {
@@ -98,35 +120,20 @@ export function UserDashboardPage() {
   const getTimeAgo = (date: Date) => {
     const now = new Date()
     const diffInMs = now.getTime() - date.getTime()
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
     const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
     const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24))
 
-    if (diffInHours < 1) return 'Just now'
-    if (diffInHours < 24) return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`
-    if (diffInDays < 7) return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`
-    return `${Math.floor(diffInDays / 7)} week${Math.floor(diffInDays / 7) > 1 ? 's' : ''} ago`
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`
+    } else if (diffInHours < 24) {
+      return `${diffInHours}h ago`
+    } else {
+      return `${diffInDays}d ago`
+    }
   }
 
   const analytics = calculateAnalytics()
-
-  // Fetch projects for the current user
-  useEffect(() => {
-    if (!user) return
-    setLoading(true)
-    supabase
-      .from('newproject')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('Error fetching projects:', error)
-          setError(error.message)
-        } else {
-          setProjects(data || [])
-        }
-        setLoading(false)
-      })
-  }, [user])
 
   // Create project
   const handleCreateProject = async (projectData: { name: string; language: string; device: string }) => {
@@ -134,50 +141,34 @@ export function UserDashboardPage() {
     setError('')
     
     try {
-      const { data, error: insertError } = await supabase.from('newproject').insert([
-        { 
-          name: projectData.name, 
-          language: projectData.language, 
-          device: projectData.device
-        }
-      ]).select()
-      
-      if (insertError) {
-        console.error('Error creating project:', insertError)
-        setError(insertError.message)
-        throw new Error(insertError.message)
-      }
-      
-      if (data && data.length > 0) {
-        setProjects([data[0], ...projects])
-        setShowCreateModal(false)
-        navigate(`/design/${data[0].id}`)
-      } else {
-        throw new Error('No data returned from project creation')
-      }
+      const newProject = await ProjectService.createProject(projectData)
+      setProjects([newProject, ...projects])
+      setShowCreateModal(false)
+      navigate(`/design/${newProject.id}`)
     } catch (err) {
       console.error('Project creation error:', err)
       setError(err instanceof Error ? err.message : 'Failed to create project')
-      throw err
     } finally {
       setLoading(false)
     }
   }
 
   // Delete project
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
     setLoading(true)
-    const { error: deleteError } = await supabase.from('newproject').delete().eq('id', id)
-    setLoading(false)
-    if (deleteError) {
-      setError(deleteError.message)
-      return
+    try {
+      await ProjectService.deleteProject(id)
+      setProjects(projects.filter(p => p.id !== id))
+    } catch (err) {
+      console.error('Error deleting project:', err)
+      setError(err instanceof Error ? err.message : 'Failed to delete project')
+    } finally {
+      setLoading(false)
     }
-    setProjects(projects.filter(p => p.id !== id))
   }
 
   // Start editing
-  const startEdit = (project) => {
+  const startEdit = (project: Project) => {
     setEditId(project.id)
     setEditName(project.name)
     setEditLanguage(project.language)
@@ -185,26 +176,29 @@ export function UserDashboardPage() {
   }
 
   // Save edit
-  const handleEdit = async (e) => {
+  const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!editName) {
+    if (!editName || !editId) {
       setError('Project name is required')
       return
     }
+    
     setLoading(true)
-    const { data, error: updateError } = await supabase.from('newproject').update({
-      name: editName,
-      language: editLanguage,
-      device: editDevice
-    }).eq('id', editId).select()
-    setLoading(false)
-    if (updateError) {
-      setError(updateError.message)
-      return
+    try {
+      const updatedProject = await ProjectService.updateProject(editId, {
+        name: editName,
+        language: editLanguage,
+        device: editDevice
+      })
+      setProjects(projects.map(p => p.id === editId ? updatedProject : p))
+      setEditId(null)
+      setError('')
+    } catch (err) {
+      console.error('Error updating project:', err)
+      setError(err instanceof Error ? err.message : 'Failed to update project')
+    } finally {
+      setLoading(false)
     }
-    setProjects(projects.map(p => p.id === editId ? data[0] : p))
-    setEditId(null)
-    setError('')
   }
 
   const renderDashboard = () => (
@@ -328,7 +322,6 @@ export function UserDashboardPage() {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">{activity.name}</p>
-                  {activity.project && <p className="text-xs text-gray-500">in {activity.project}</p>}
                 </div>
                 <span className="text-xs text-gray-500">{activity.time}</span>
               </div>
