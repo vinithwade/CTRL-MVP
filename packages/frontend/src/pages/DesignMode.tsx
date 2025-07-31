@@ -2392,24 +2392,48 @@ export function DesignMode({ projectId }: DesignModeProps) {
   const canvasSize = calculateCanvasSize()
 
   // Helper function to calculate screen position consistently
-  const calculateScreenPosition = (screenIndex: number, _screen: Screen) => {
-    const columns = 2
-    const gapX = 32
-    const gapY = 32
-    const padding = 64
+  const calculateScreenPosition = (screenIndex: number, _screen: Screen): { defaultX: number; defaultY: number } => {
+    // If this is the first screen, position it at the center
+    if (screenIndex === 0) {
+      return { defaultX: 100, defaultY: 100 }
+    }
     
-    // Use consistent grid cell size based on maximum screen dimensions
-    // This prevents jumping when screens of different sizes are added
-    const maxScreenWidth = Math.max(...screens.map(s => s.width || 400))
-    const maxScreenHeight = Math.max(...screens.map(s => s.height || 600))
+    // For subsequent screens, position them beside the previous screen
+    const gapX = 50 // Horizontal gap between screens
+    const gapY = 50 // Vertical gap between screens
     
-    const cellWidth = maxScreenWidth + gapX
-    const cellHeight = maxScreenHeight + gapY
+    // Get the position of the previous screen
+    const previousScreen = screens[screenIndex - 1]
+    const previousPosition = screenPositions[previousScreen.id] || { x: 0, y: 0 }
+    const previousScreenIndex = screens.findIndex(s => s.id === previousScreen.id)
+    const previousDefaultPos: { defaultX: number; defaultY: number } = calculateScreenPosition(previousScreenIndex, previousScreen)
     
-    const defaultX = (screenIndex % columns) * cellWidth + padding
-    const defaultY = Math.floor(screenIndex / columns) * cellHeight + padding
+    const previousX: number = previousPosition.x + previousDefaultPos.defaultX
+    const previousY: number = previousPosition.y + previousDefaultPos.defaultY
     
-    return { defaultX, defaultY }
+    // Position the new screen to the right of the previous screen
+    // If there's not enough space to the right, position it below
+    const newX: number = previousX + previousScreen.width + gapX
+    const newY: number = previousY
+    
+    // Check if the new position would be too far to the right
+    // If so, position it below the first screen in the row
+    const maxX = 1200 // Maximum X position before wrapping
+    if (newX > maxX) {
+      // Find the first screen in the current row and position below it
+      const firstScreenInRow = screens[0]
+      const firstPosition = screenPositions[firstScreenInRow.id] || { x: 0, y: 0 }
+      const firstDefaultPos: { defaultX: number; defaultY: number } = calculateScreenPosition(0, firstScreenInRow)
+      const firstX: number = firstPosition.x + firstDefaultPos.defaultX
+      const firstY: number = firstPosition.y + firstDefaultPos.defaultY
+      
+      return {
+        defaultX: firstX,
+        defaultY: firstY + firstScreenInRow.height + gapY
+      }
+    }
+    
+    return { defaultX: newX, defaultY: newY }
   }
 
   // Recalculate canvas size when screens change
@@ -2484,6 +2508,44 @@ export function DesignMode({ projectId }: DesignModeProps) {
   // Minimum size for resizing components
   const MIN_WIDTH = 20;
   const MIN_HEIGHT = 20;
+
+  // Helper function to automatically position new screens beside the current active screen
+  const createScreenWithPosition = (screenData: Partial<Screen>) => {
+    const newScreen: Screen = {
+      id: Date.now().toString(),
+      name: screenData.name || `Screen ${screens.length + 1}`,
+      width: screenData.width || 1200,
+      height: screenData.height || 800,
+      type: screenData.type || 'custom',
+      layers: [
+        {
+          id: Date.now().toString() + '_layer',
+          name: 'Main Layout',
+          visible: true,
+          locked: false,
+          components: []
+        }
+      ],
+      activeLayer: Date.now().toString() + '_layer'
+    }
+    
+    // Add the screen first
+    addScreen(newScreen)
+    
+    // Then position it beside the current active screen
+    setTimeout(() => {
+      const newScreenIndex = screens.length // This will be the index of the new screen
+      
+      // Set the position for the new screen (positioning is handled by calculateScreenPosition)
+      setScreenPositions(prev => ({
+        ...prev,
+        [newScreen.id]: { x: 0, y: 0 }
+      }))
+      
+      // Set the new screen as active
+      setActiveScreen(newScreen.id)
+    }, 0)
+  }
 
   return (
     <div className="h-screen flex bg-gray-50 font-['Inter'] font-semibold">
@@ -2828,24 +2890,12 @@ export function DesignMode({ projectId }: DesignModeProps) {
                         <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Quick Add</h4>
                         <button
                           onClick={() => {
-                            const newScreen: Screen = {
-                              id: Date.now().toString(),
+                            createScreenWithPosition({
                               name: `Screen ${screens.length + 1}`,
                               width: 1200,
                               height: 800,
-                              type: 'custom',
-                              layers: [
-                                {
-                                  id: Date.now().toString() + '_layer',
-                                  name: 'Main Layout',
-                                  visible: true,
-                                  locked: false,
-                                  components: []
-                                }
-                              ],
-                              activeLayer: Date.now().toString() + '_layer'
-                            }
-                            addScreen(newScreen)
+                              type: 'custom'
+                            })
                           }}
                           className="text-xs text-green-600 hover:text-green-700 flex items-center space-x-1"
                         >
@@ -2858,24 +2908,12 @@ export function DesignMode({ projectId }: DesignModeProps) {
                           <button
                             key={preset.name}
                             onClick={() => {
-                              const newScreen: Screen = {
-                                id: Date.now().toString(),
+                              createScreenWithPosition({
                                 name: preset.name,
                                 width: preset.width,
                                 height: preset.height,
-                                type: preset.type,
-                                layers: [
-                                  {
-                                    id: Date.now().toString() + '_layer',
-                                    name: 'Main Layout',
-                                    visible: true,
-                                    locked: false,
-                                    components: []
-                                  }
-                                ],
-                                activeLayer: Date.now().toString() + '_layer'
-                              }
-                              addScreen(newScreen)
+                                type: preset.type
+                              })
                             }}
                             className="group relative bg-white border border-gray-200 rounded-lg p-3 hover:border-green-300 hover:shadow-md hover:shadow-green-100 transition-all duration-200 w-full text-left"
                           >
