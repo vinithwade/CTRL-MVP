@@ -502,6 +502,12 @@ export function DesignMode({ projectId }: DesignModeProps) {
         deleteSelectedComponent()
       }
       
+      // Delete key for deleting active screen (when no component is selected)
+      if (e.key === 'Delete' && !selectedComponentData && activeScreen) {
+        e.preventDefault()
+        deleteActiveScreen()
+      }
+      
       // Escape to deselect
       if (e.key === 'Escape') {
         setSelectedComponent(null)
@@ -2331,26 +2337,25 @@ export function DesignMode({ projectId }: DesignModeProps) {
     }
   }
 
-  // Delete component function
+  // Delete selected component
   const deleteSelectedComponent = () => {
-    if (selectedComponent && currentScreen && currentLayer) {
-      // Remove from current layer
-      const updatedLayers = currentScreen.layers.map(layer => ({
-        ...layer,
-        components: layer.components.filter(comp => comp.id !== selectedComponent.id)
-      }))
-      
-      updateScreen(activeScreen!, {
-        layers: updatedLayers
-      })
-      
-      // Also remove from global components array
+    if (selectedComponent) {
       deleteComponent(selectedComponent.id)
-      
-      // Clear selection
       setSelectedComponent(null)
-      
-      console.log('Component deleted:', selectedComponent.id)
+    }
+  }
+
+  // Delete active screen
+  const deleteActiveScreen = () => {
+    if (activeScreen && screens.length > 1) {
+      const screenToDelete = screens.find(s => s.id === activeScreen)
+      if (screenToDelete) {
+        if (window.confirm(`Are you sure you want to delete "${screenToDelete.name}"? This action cannot be undone.`)) {
+          deleteScreen(activeScreen)
+        }
+      }
+    } else if (screens.length <= 1) {
+      alert('Cannot delete the last screen. Please add another screen first.')
     }
   }
 
@@ -2862,77 +2867,101 @@ export function DesignMode({ projectId }: DesignModeProps) {
 
                   {/* Existing Screens */}
                   <div>
-                    <h4 className="text-xs font-medium text-gray-700 mb-2">Your Screens</h4>
-                <div className="space-y-2">
-                      {screens.map((screen, index) => (
-                        <div 
-                          key={screen.id} 
-                          className="flex items-center justify-between p-2 bg-gray-50 rounded cursor-pointer hover:bg-gray-100 transition-colors"
-                          onDoubleClick={() => {
-                            // Navigate to the screen on canvas by centering the view
-                            const index = screens.findIndex(s => s.id === screen.id)
-                            const { defaultX, defaultY } = calculateScreenPosition(index, screen)
-                            const currentPosition = screenPositions[screen.id] || { x: 0, y: 0 }
-                            const actualX = currentPosition.x + defaultX
-                            const actualY = currentPosition.y + defaultY
-                            
-                            // Get the main canvas container (the one with overflow-hidden)
-                            const canvasContainer = document.querySelector('.flex-1.bg-gray-100.overflow-hidden.relative') as HTMLElement
-                            if (canvasContainer) {
-                              const canvasRect = canvasContainer.getBoundingClientRect()
-                              const containerWidth = canvasRect.width
-                              const containerHeight = canvasRect.height
-                              
-                              // Calculate center position for the screen
-                              const centerX = actualX + (screen.width || 400) / 2
-                              const centerY = actualY + (screen.height || 600) / 2
-                              
-                              // Calculate pan to center the screen in the viewport
-                              const newPanX = (containerWidth / 2) - (centerX * zoom)
-                              const newPanY = (containerHeight / 2) - (centerY * zoom)
-                              
-                              // Set the new pan position
-                              setPan({ x: newPanX, y: newPanY })
-                              
-                              // Set the screen as active
-                              setActiveScreen(screen.id)
-                            }
-                          }}
-                  >
-                    <div className="flex items-center space-x-2">
-                            <div 
-                              className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer ${
-                                activeScreen === screen.id ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-600'
-                              }`}
-                              onClick={() => setActiveScreen(screen.id)}
-                            >
-                              {index + 1}
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-xs font-medium text-gray-700">Your Screens</h4>
+                      <span className="text-xs text-gray-400">Press Delete to remove active screen</span>
                     </div>
-                            <input
-                              type="text"
-                              value={screen.name}
-                              onChange={(e) => updateScreen(screen.id, { name: e.target.value })}
-                              className={`text-sm font-medium bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white px-1 rounded min-w-0 ${
-                                activeScreen === screen.id ? 'text-primary-600' : 'text-gray-700'
-                              }`}
-                              onClick={(e) => e.stopPropagation()}
-                            />
-                    </div>
-                          <div className="flex items-center space-x-1">
-                            <span className="text-xs text-gray-500">{screen.width}x{screen.height}</span>
-                            {screens.length > 1 && (
-                        <button
-                                onClick={() => deleteScreen(screen.id)}
-                                className="text-red-400 hover:text-red-600"
+                    <div className="space-y-2">
+                      {screens.length === 0 ? (
+                        <div className="text-center py-4 text-gray-500">
+                          <p className="text-xs">No screens yet</p>
+                          <p className="text-xs text-gray-400">Add a screen to get started</p>
+                        </div>
+                      ) : (
+                        screens.map((screen, index) => (
+                          <div 
+                            key={screen.id} 
+                            className={`flex items-center justify-between p-2 rounded cursor-pointer transition-colors ${
+                              activeScreen === screen.id 
+                                ? 'bg-blue-50 border border-blue-200' 
+                                : 'bg-gray-50 hover:bg-gray-100'
+                            }`}
+                            onDoubleClick={() => {
+                              // Navigate to the screen on canvas by centering the view
+                              const index = screens.findIndex(s => s.id === screen.id)
+                              const { defaultX, defaultY } = calculateScreenPosition(index, screen)
+                              const currentPosition = screenPositions[screen.id] || { x: 0, y: 0 }
+                              const actualX = currentPosition.x + defaultX
+                              const actualY = currentPosition.y + defaultY
+                              
+                              // Get the main canvas container (the one with overflow-hidden)
+                              const canvasContainer = document.querySelector('.flex-1.bg-gray-100.overflow-hidden.relative') as HTMLElement
+                              if (canvasContainer) {
+                                const canvasRect = canvasContainer.getBoundingClientRect()
+                                const containerWidth = canvasRect.width
+                                const containerHeight = canvasRect.height
+                                
+                                // Calculate center position for the screen
+                                const centerX = actualX + (screen.width || 400) / 2
+                                const centerY = actualY + (screen.height || 600) / 2
+                                
+                                // Calculate pan to center the screen in the viewport
+                                const newPanX = (containerWidth / 2) - (centerX * zoom)
+                                const newPanY = (containerHeight / 2) - (centerY * zoom)
+                                
+                                // Set the new pan position
+                                setPan({ x: newPanX, y: newPanY })
+                                
+                                // Set the screen as active
+                                setActiveScreen(screen.id)
+                              }
+                            }}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <div 
+                                className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold cursor-pointer ${
+                                  activeScreen === screen.id ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-600'
+                                }`}
+                                onClick={() => setActiveScreen(screen.id)}
+                              >
+                                {index + 1}
+                              </div>
+                              <input
+                                type="text"
+                                value={screen.name}
+                                onChange={(e) => updateScreen(screen.id, { name: e.target.value })}
+                                className={`text-sm font-medium bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white px-1 rounded min-w-0 ${
+                                  activeScreen === screen.id ? 'text-primary-600' : 'text-gray-700'
+                                }`}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs text-gray-500">{screen.width}x{screen.height}</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (screens.length > 1) {
+                                    if (window.confirm(`Are you sure you want to delete "${screen.name}"? This action cannot be undone.`)) {
+                                      deleteScreen(screen.id)
+                                    }
+                                  } else {
+                                    alert('Cannot delete the last screen. Please add another screen first.')
+                                  }
+                                }}
+                                className={`text-red-400 hover:text-red-600 transition-colors ${
+                                  screens.length <= 1 ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                                }`}
+                                title={screens.length <= 1 ? 'Cannot delete the last screen' : 'Delete screen'}
                               >
                                 <Trash2 className="h-3 w-3" />
-                        </button>
-                            )}
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
-                </div>
+                  </div>
                 </div>
               )}
 
