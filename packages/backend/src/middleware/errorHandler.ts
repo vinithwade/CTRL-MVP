@@ -30,10 +30,4 @@ export const errorHandler = (
       timestamp: new Date().toISOString()
     }
   })
-}
-
-export const notFound = (req: Request, res: Response, next: NextFunction) => {
-  const error = new Error(`Route ${req.originalUrl} not found`) as AppError
-  error.statusCode = 404
-  next(error)
 } 

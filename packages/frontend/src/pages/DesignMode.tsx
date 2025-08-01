@@ -82,6 +82,8 @@ export function DesignMode({ projectId }: DesignModeProps) {
   // Add state for project information
   const [projectInfo, setProjectInfo] = useState<{ name: string; language: string; device: string } | null>(null)
   const [loadingProject, setLoadingProject] = useState(false)
+  const [isLoadingData, setIsLoadingData] = useState(false) // Add loading state to prevent save during load
+  const [hasLoadedData, setHasLoadedData] = useState(false) // Track if data has been loaded
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
@@ -141,6 +143,11 @@ export function DesignMode({ projectId }: DesignModeProps) {
     }
   }, [selectedComponentData])
 
+  // Debug loading state changes
+  useEffect(() => {
+    console.log('Loading state changed:', { isLoadingData, hasLoadedData })
+  }, [isLoadingData, hasLoadedData])
+
   // Save project data functionality
   const saveProjectData = useCallback(async () => {
     if (!projectId) {
@@ -148,10 +155,16 @@ export function DesignMode({ projectId }: DesignModeProps) {
       return
     }
 
+    // Prevent saving while loading data
+    if (isLoadingData) {
+      console.log('Skipping save - data is currently loading')
+      return
+    }
+
     try {
+      console.log('Saving project data with', screens.length, 'screens')
       const designData = {
-        // Don't save screens - only save user-created screens
-        // screens,
+        screens, // Save screens to persist them
         activeScreen,
         variables,
         zoom,
@@ -165,7 +178,13 @@ export function DesignMode({ projectId }: DesignModeProps) {
     } catch (error) {
       console.error('Error saving project data:', error)
     }
-  }, [projectId, activeScreen, variables, zoom, pan, sidebarStates, screenPositions])
+  }, [projectId, screens, activeScreen, variables, zoom, pan, sidebarStates, screenPositions, isLoadingData])
+
+  // Manual save function
+  const manualSave = useCallback(async () => {
+    console.log('Manual save triggered')
+    await saveProjectData()
+  }, [saveProjectData])
 
   // Load project data functionality
   const loadProjectData = useCallback(async () => {
@@ -174,55 +193,73 @@ export function DesignMode({ projectId }: DesignModeProps) {
       return
     }
 
+    setIsLoadingData(true) // Set loading state to prevent saves
     try {
+      console.log('Loading project data for projectId:', projectId)
       const designData = await ProjectService.getProjectData(projectId, 'design')
       
       if (designData && designData.data) {
+        console.log('Found saved design data:', designData.data)
         const { screens: savedScreens, activeScreen: savedActiveScreen, variables: savedVariables, zoom: savedZoom, pan: savedPan, sidebarStates: savedSidebarStates, screenPositions: savedScreenPositions } = designData.data
         
-        // Restore design state - only if screens array is empty to prevent duplicates
-        // Don't load saved screens - only show user-created screens
-        // if (savedScreens && screens.length === 0) {
-        //   savedScreens.forEach((screen: Screen) => {
-        //     addScreen(screen)
-        //   })
-        // }
+        // Only restore screens if they exist
+        if (savedScreens && Array.isArray(savedScreens) && savedScreens.length > 0) {
+          console.log('Restoring', savedScreens.length, 'screens')
+          savedScreens.forEach((screen: Screen) => {
+            console.log('Adding screen:', screen.name, screen.id)
+            addScreen(screen)
+          })
+        }
         
+        // Restore other state after screens are loaded
         if (savedActiveScreen) {
+          console.log('Restoring active screen:', savedActiveScreen)
           setActiveScreen(savedActiveScreen)
         }
         
         if (savedVariables) {
+          console.log('Restoring variables')
           setVariables(savedVariables)
         }
         
         if (savedZoom) {
+          console.log('Restoring zoom:', savedZoom)
           setZoom(savedZoom)
         }
         
         if (savedPan) {
+          console.log('Restoring pan:', savedPan)
           setPan(savedPan)
         }
         
         if (savedSidebarStates) {
+          console.log('Restoring sidebar states')
           setSidebarStates(savedSidebarStates)
         }
         
         if (savedScreenPositions) {
+          console.log('Restoring screen positions')
           setScreenPositions(savedScreenPositions)
         }
         
         console.log('Project design data loaded successfully')
+      } else {
+        console.log('No saved design data found - this is a new project')
       }
     } catch (error) {
       console.error('Error loading project data:', error)
+    } finally {
+      console.log('Loading completed, clearing loading state')
+      setIsLoadingData(false) // Clear loading state
+      setHasLoadedData(true) // Mark as loaded
     }
-  }, [projectId, addScreen, setActiveScreen, screens.length])
+  }, [projectId, addScreen, setActiveScreen, setVariables, setZoom, setPan, setSidebarStates, setScreenPositions])
 
   // Auto-save functionality
   useEffect(() => {
     if (projectId) {
       const autoSaveInterval = setInterval(() => {
+        console.log('Auto-saving project data...')
         saveProjectData()
       }, 30000) // Auto-save every 30 seconds
 
@@ -230,12 +267,54 @@ export function DesignMode({ projectId }: DesignModeProps) {
     }
   }, [projectId, saveProjectData])
 
+  // Save when screens change - with guard to prevent infinite loop
+  useEffect(() => {
+    if (projectId && screens.length > 0 && !isLoadingData) {
+      // Add a small delay to prevent immediate save after load
+      const timeoutId = setTimeout(() => {
+        console.log('Screens changed, saving project data...')
+        saveProjectData()
+      }, 3000) // 3 second delay
+
+      return () => clearTimeout(timeoutId)
+    }
+  }, [projectId, screens, saveProjectData, isLoadingData])
+
+  // Save when active screen changes
+  useEffect(() => {
+    if (projectId && activeScreen && !isLoadingData) {
+      console.log('Active screen changed, saving project data...')
+      saveProjectData()
+    }
+  }, [projectId, activeScreen, saveProjectData, isLoadingData])
+
+  // Save when screen positions change
+  useEffect(() => {
+    if (projectId && Object.keys(screenPositions).length > 0 && !isLoadingData) {
+      console.log('Screen positions changed, saving project data...')
+      saveProjectData()
+    }
+  }, [projectId, screenPositions, saveProjectData, isLoadingData])
+
   // Load project data on mount - only once
   useEffect(() => {
-    if (projectId && screens.length === 0) {
+    if (projectId) {
+      console.log('Loading project data on mount for projectId:', projectId)
+      
+      // Add timeout to prevent infinite loading
+      const loadTimeout = setTimeout(() => {
+        if (isLoadingData) {
+          console.warn('Loading timeout reached, clearing loading state')
+          setIsLoadingData(false)
+          setHasLoadedData(true)
+        }
+      }, 5000) // 5 second timeout
+      
       loadProjectData()
+      
+      return () => clearTimeout(loadTimeout)
     }
-  }, [projectId]) // Remove loadProjectData from dependencies
+  }, [projectId]) // Remove loadProjectData from dependencies to prevent infinite loop
 
   // Local update function that ensures proper synchronization
   const updateComponentLocal = (componentId: string, updates: Partial<Component>) => {
@@ -258,6 +337,15 @@ export function DesignMode({ projectId }: DesignModeProps) {
       })
       
       console.log('Component updated in both global context and screen layers')
+      
+      // Trigger save when component is modified
+      if (projectId) {
+        console.log('Component modified, triggering save...')
+        // Add a small delay to prevent rapid saves
+        setTimeout(() => {
+          saveProjectData()
+        }, 500)
+      }
     }
   }
 
@@ -715,88 +803,52 @@ export function DesignMode({ projectId }: DesignModeProps) {
   // Keyboard shortcuts for mode switching
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl/Cmd + 1, 2, 3 for mode switching
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+      // Handle keyboard shortcuts
+      if (e.ctrlKey || e.metaKey) {
         switch (e.key) {
-          case '1':
+          case 's':
             e.preventDefault()
-            navigateToMode('design')
+            console.log('Ctrl+S pressed - saving project')
+            manualSave()
             break
-          case '2':
+          case 'z':
             e.preventDefault()
-            navigateToMode('logic')
+            // TODO: Implement undo
+            console.log('Undo')
             break
-          case '3':
+          case 'y':
             e.preventDefault()
-            navigateToMode('code')
+            // TODO: Implement redo
+            console.log('Redo')
+            break
+          case 'Delete':
+          case 'Backspace':
+            e.preventDefault()
+            if (selectedComponentData) {
+              deleteSelectedComponent()
+            }
             break
         }
-      }
-      
-      // Delete key for deleting selected component
-      if (e.key === 'Delete' && selectedComponentData) {
+      } else {
+        switch (e.key) {
+          case 'Delete':
+          case 'Backspace':
         e.preventDefault()
+            if (selectedComponentData) {
         deleteSelectedComponent()
       }
-      
-      // Delete key for deleting active screen (when no component is selected)
-      if (e.key === 'Delete' && !selectedComponentData && activeScreen) {
+            break
+          case 'Escape':
         e.preventDefault()
-        deleteActiveScreen()
-      }
-      
-      // Escape to deselect
-      if (e.key === 'Escape') {
         setSelectedComponent(null)
-      }
-
-      // Zoom shortcuts
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === '=' || e.key === '+') {
-          e.preventDefault()
-          setZoom(prev => Math.min(prev * 1.2, 5))
-        } else if (e.key === '-') {
-          e.preventDefault()
-          setZoom(prev => Math.max(prev / 1.2, 0.1))
-        } else if (e.key === '0') {
-          e.preventDefault()
-          setZoom(1)
-          setPan({ x: 0, y: 0 })
-        } else if (e.key === 'b') {
-          e.preventDefault()
-          setSidebarVisible(prev => !prev)
-        }
-      }
-
-      // Component layering shortcuts
-      if (e.ctrlKey || e.metaKey) {
-        if (e.shiftKey && e.key === ']') {
-          e.preventDefault()
-          if (selectedComponent) {
-            bringToFront(selectedComponent.id)
-          }
-        } else if (e.shiftKey && e.key === '[') {
-          e.preventDefault()
-          if (selectedComponent) {
-            sendToBack(selectedComponent.id)
-          }
-        } else if (e.key === ']') {
-          e.preventDefault()
-          if (selectedComponent) {
-            bringForward(selectedComponent.id)
-          }
-        } else if (e.key === '[') {
-          e.preventDefault()
-          if (selectedComponent) {
-            sendBackward(selectedComponent.id)
-          }
+            break
         }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [navigateToMode, selectedComponent, selectedComponentData, sidebarVisible])
+  }, [selectedComponent, selectedComponentData, manualSave])
 
   // Wheel event for zoom and pan (Figma-like)
   useEffect(() => {
@@ -2844,6 +2896,17 @@ export function DesignMode({ projectId }: DesignModeProps) {
 
   return (
     <div className="h-screen flex bg-gray-50 font-['Inter'] font-semibold">
+      {/* Loading Indicator */}
+      {isLoadingData && (
+        <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-600 font-medium">Loading design data...</p>
+            <p className="text-sm text-gray-500 mt-2">Please wait while we load your project</p>
+          </div>
+        </div>
+      )}
+      
       {/* Left Panel - Library & Layers & Variables & Screens */}
       {sidebarVisible && (
         <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -3575,18 +3638,18 @@ export function DesignMode({ projectId }: DesignModeProps) {
               </div>
             )}
           </div>
-          
+
           {/* Back to Dashboard Button - Bottom */}
           <div className="p-4 border-t border-gray-200">
-            <button
+        <button
               onClick={() => navigate('/user-dashboard')}
               className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg flex items-center justify-center space-x-2 transition-colors"
-            >
+        >
               <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
+          </svg>
               <span>Back to Dashboard</span>
-            </button>
+        </button>
           </div>
         </div>
       )}
@@ -3681,6 +3744,16 @@ export function DesignMode({ projectId }: DesignModeProps) {
               <Maximize2 className="h-4 w-4" />
             </button>
             <div className="h-4 w-px bg-gray-300"></div>
+            <button 
+              onClick={manualSave}
+              className="text-sm text-gray-600 hover:text-gray-900 flex items-center space-x-1"
+              title="Save project (Ctrl+S)"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+              </svg>
+              <span>Save</span>
+            </button>
             <button className="text-sm text-gray-600 hover:text-gray-900">Undo</button>
             <button className="text-sm text-gray-600 hover:text-gray-900">Redo</button>
           </div>
@@ -3777,16 +3850,13 @@ export function DesignMode({ projectId }: DesignModeProps) {
             {screens.length === 0 && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center mx-auto mb-4">
-                    <Smartphone className="w-8 h-8 text-gray-400" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No screens yet</h3>
-                  <p className="text-sm text-gray-500 mb-4">Add a screen to start designing your app</p>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-3">Add Your First Screen</h3>
+                  <p className="text-sm text-gray-500 mb-4">Start designing your app by adding a screen</p>
                   <button 
                     onClick={() => setShowScreenSelector(true)}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium transition-colors duration-200 shadow-sm hover:shadow-md"
                   >
-                    Add Your First Screen
+                    Add Screen
                   </button>
                 </div>
               </div>
@@ -3971,16 +4041,16 @@ export function DesignMode({ projectId }: DesignModeProps) {
                   <h3 className="text-sm font-medium text-gray-900">Properties</h3>
                   <p className="text-xs text-gray-500 mt-1">{selectedComponentData.name}</p>
                 </div>
-                <button
+        <button
                   onClick={() => deleteSelectedComponent()}
                   className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
                   title="Delete component (Delete key)"
-                >
+        >
                   <Trash2 className="h-4 w-4" />
-                </button>
+        </button>
               </div>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-4">
                 {/* Styling */}
@@ -4157,24 +4227,24 @@ export function DesignMode({ projectId }: DesignModeProps) {
                         {selectedComponentData.interactions.click && (
                           <div className="flex items-center justify-between p-2 bg-blue-50 rounded text-xs">
                             <span className="text-blue-700">Click: {selectedComponentData.interactions.click}</span>
-                            <button
+        <button
                               onClick={() => removeInteraction(selectedComponentData.id, 'click')}
                               className="text-blue-500 hover:text-blue-700"
-                            >
+        >
                               ×
-                            </button>
+        </button>
                           </div>
                         )}
                         {selectedComponentData.interactions.hover && (
                           <div className="flex items-center justify-between p-2 bg-green-50 rounded text-xs">
                             <span className="text-green-700">Hover: {selectedComponentData.interactions.hover}</span>
-                            <button
+        <button
                               onClick={() => removeInteraction(selectedComponentData.id, 'hover')}
                               className="text-green-500 hover:text-green-700"
-                            >
+        >
                               ×
-                            </button>
-                          </div>
+        </button>
+      </div>
                         )}
                         {selectedComponentData.interactions.animation && (
                           <div className="flex items-center justify-between p-2 bg-purple-50 rounded text-xs">
@@ -4191,7 +4261,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
                     )}
                     
                     {/* Add Interaction Buttons */}
-                    <button
+              <button
                       onClick={() => addClickEvent(selectedComponentData.id)}
                       className="w-full text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-1 hover:bg-blue-100"
                     >
@@ -4228,7 +4298,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
                             >
                               ×
                             </button>
-                          </div>
+                        </div>
                         )}
                         {selectedComponentData.dataBinding.api && (
                           <div className="flex items-center justify-between p-2 bg-indigo-50 rounded text-xs">
@@ -4245,7 +4315,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
                     )}
                     
                     {/* Add Data Binding Buttons */}
-                    <button
+                    <button 
                       onClick={() => bindToVariable(selectedComponentData.id)}
                       className="w-full text-xs bg-orange-50 text-orange-700 border border-orange-200 rounded px-2 py-1 hover:bg-orange-100"
                     >
@@ -4261,44 +4331,44 @@ export function DesignMode({ projectId }: DesignModeProps) {
                 </div>
 
                 {/* Layer Management */}
-                <div>
+                        <div>
                   <h4 className="text-xs font-medium text-gray-700 mb-2">Layer</h4>
                   <div className="space-y-2">
                     <div className="flex space-x-1">
-                      <button
+                    <button
                         onClick={() => bringToFront(selectedComponentData.id)}
                         className="flex-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100"
                         title="Bring to Front"
                       >
                         Front
-                      </button>
-                      <button
+                    </button>
+                    <button
                         onClick={() => bringForward(selectedComponentData.id)}
                         className="flex-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100"
                         title="Bring Forward"
                       >
                         ↑
-                      </button>
-                      <button
+                    </button>
+                    <button
                         onClick={() => sendBackward(selectedComponentData.id)}
                         className="flex-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100"
                         title="Send Backward"
                       >
                         ↓
-                      </button>
-                      <button
+                    </button>
+                    <button
                         onClick={() => sendToBack(selectedComponentData.id)}
                         className="flex-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100"
                         title="Send to Back"
                       >
                         Back
-                      </button>
-                    </div>
+                    </button>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
+                        </div>
+                      </div>
+                        </div>
+                        </div>
         )}
       </div>
 

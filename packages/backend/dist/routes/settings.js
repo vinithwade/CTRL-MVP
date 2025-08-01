@@ -88,13 +88,13 @@ router.get('/:category', async (req, res) => {
                 error: 'Setting category not found'
             });
         }
-        res.json({
+        return res.json({
             success: true,
             data: settings
         });
     }
     catch (error) {
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
             error: 'Failed to fetch setting category'
         });

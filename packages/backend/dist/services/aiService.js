@@ -20,6 +20,9 @@ export class AIService {
     }
     async processChatMessage(request) {
         try {
+            if (!request.message || request.message.trim().length === 0) {
+                throw new Error('Message is required and cannot be empty');
+            }
             if (this.isInitialized && this.openai) {
                 const completion = await this.openai.chat.completions.create({
                     model: "gpt-3.5-turbo",
@@ -54,34 +57,61 @@ export class AIService {
         }
         catch (error) {
             console.error('AI processing error:', error);
-            return this.generateSimulatedResponse(request.message);
+            return {
+                id: Date.now().toString(),
+                content: 'I apologize, but I encountered an error processing your request. Please try again.',
+                confidence: 0.1,
+                metadata: {
+                    model: 'error-fallback',
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                },
+                timestamp: new Date()
+            };
         }
     }
     async batchProcess(request) {
-        const results = [];
-        for (const item of request.data) {
-            try {
-                let result;
-                switch (request.operation) {
-                    case 'classify':
-                        result = await this.classifyData(item);
-                        break;
-                    case 'summarize':
-                        result = await this.summarizeData(item);
-                        break;
-                    case 'extract':
-                        result = await this.extractData(item);
-                        break;
-                    default:
-                        result = { error: 'Unknown operation' };
+        try {
+            if (!request.data || !Array.isArray(request.data) || request.data.length === 0) {
+                throw new Error('Data array is required and cannot be empty');
+            }
+            if (!request.operation || typeof request.operation !== 'string') {
+                throw new Error('Operation is required and must be a string');
+            }
+            const results = [];
+            for (const item of request.data) {
+                try {
+                    let result;
+                    switch (request.operation) {
+                        case 'classify':
+                            result = await this.classifyData(item);
+                            break;
+                        case 'summarize':
+                            result = await this.summarizeData(item);
+                            break;
+                        case 'extract':
+                            result = await this.extractData(item);
+                            break;
+                        default:
+                            result = { error: 'Unknown operation' };
+                    }
+                    results.push(result);
                 }
-                results.push(result);
+                catch (error) {
+                    results.push({
+                        error: 'Processing failed',
+                        details: error instanceof Error ? error.message : 'Unknown error'
+                    });
+                }
             }
-            catch (error) {
-                results.push({ error: 'Processing failed' });
-            }
+            return results;
         }
-        return results;
+        catch (error) {
+            console.error('Batch processing error:', error);
+            return [{
+                    error: 'Batch processing failed',
+                    details: error instanceof Error ? error.message : 'Unknown error'
+                }];
+        }
     }
     async getStatus() {
         return {
@@ -168,12 +198,11 @@ export class AIService {
     }
     generateSimulatedResponse(message) {
         const responses = [
-            `I understand you said: "${message}". This is a simulated AI response.`,
-            `Based on your message: "${message}", here's what I can help you with...`,
-            `Thank you for your input: "${message}". Let me provide some assistance.`,
+            `I understand you said: "${message}". Let me help you with that.`,
+            `Based on your message: "${message}", here's what I think.`,
             `I've processed your request: "${message}". Here's my response.`
         ];
-        const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+        const randomResponse = responses[Math.floor(Math.random() * responses.length)] || 'I received your message and am processing it.';
         return {
             id: Date.now().toString(),
             content: randomResponse,

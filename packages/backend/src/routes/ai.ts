@@ -23,6 +23,14 @@ router.post('/chat', async (req, res, next) => {
   try {
     const { message, context, userId } = chatMessageSchema.parse(req.body)
     
+    if (!message || message.trim().length === 0) {
+      res.status(400).json({
+        success: false,
+        error: 'Message is required and cannot be empty'
+      })
+      return
+    }
+
     const response = await aiService.processChatMessage({
       message,
       context: context || '',
@@ -35,6 +43,13 @@ router.post('/chat', async (req, res, next) => {
       data: response
     })
   } catch (error) {
+    if (error instanceof Error) {
+      res.status(400).json({
+        success: false,
+        error: error.message
+      })
+      return
+    }
     next(error)
   }
 })

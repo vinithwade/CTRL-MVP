@@ -16,10 +16,17 @@ const batchProcessSchema = z.object({
 router.post('/chat', async (req, res, next) => {
     try {
         const { message, context, userId } = chatMessageSchema.parse(req.body);
+        if (!message || message.trim().length === 0) {
+            res.status(400).json({
+                success: false,
+                error: 'Message is required and cannot be empty'
+            });
+            return;
+        }
         const response = await aiService.processChatMessage({
             message,
-            context,
-            userId,
+            context: context || '',
+            userId: userId || '',
             timestamp: new Date()
         });
         res.json({
@@ -28,6 +35,13 @@ router.post('/chat', async (req, res, next) => {
         });
     }
     catch (error) {
+        if (error instanceof Error) {
+            res.status(400).json({
+                success: false,
+                error: error.message
+            });
+            return;
+        }
         next(error);
     }
 });
@@ -37,7 +51,7 @@ router.post('/batch', async (req, res, next) => {
         const results = await aiService.batchProcess({
             data,
             operation,
-            options
+            options: options || {}
         });
         res.json({
             success: true,
@@ -82,13 +96,13 @@ router.post('/analyze', async (req, res, next) => {
             });
         }
         const analysis = await aiService.analyzeText(text, analysisType);
-        res.json({
+        return res.json({
             success: true,
             data: analysis
         });
     }
     catch (error) {
-        next(error);
+        return next(error);
     }
 });
 router.post('/image', async (req, res, next) => {
@@ -101,13 +115,13 @@ router.post('/image', async (req, res, next) => {
             });
         }
         const result = await aiService.processImage(imageUrl, operation);
-        res.json({
+        return res.json({
             success: true,
             data: result
         });
     }
     catch (error) {
-        next(error);
+        return next(error);
     }
 });
 export default router;
