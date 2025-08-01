@@ -84,6 +84,9 @@ export function DesignMode({ projectId }: DesignModeProps) {
   const [loadingProject, setLoadingProject] = useState(false)
   const [isLoadingData, setIsLoadingData] = useState(false) // Add loading state to prevent save during load
   const [hasLoadedData, setHasLoadedData] = useState(false) // Track if data has been loaded
+  const [isSaving, setIsSaving] = useState(false) // Add saving state indicator
+  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null) // Add debounce timeout
+  const [savedIndicator, setSavedIndicator] = useState(false) // Add saved indicator
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
@@ -148,6 +151,23 @@ export function DesignMode({ projectId }: DesignModeProps) {
     console.log('Loading state changed:', { isLoadingData, hasLoadedData })
   }, [isLoadingData, hasLoadedData])
 
+  // Monitor screens changes and ensure proper loading
+  useEffect(() => {
+    console.log('Screens changed:', { 
+      screensCount: screens.length, 
+      hasLoadedData, 
+      isLoadingData,
+      activeScreen,
+      screenNames: screens.map(s => s.name)
+    })
+    
+    // If we have loaded data and screens, but no active screen, set the first one
+    if (hasLoadedData && !isLoadingData && screens.length > 0 && !activeScreen) {
+      console.log('Setting first screen as active after load')
+      setActiveScreen(screens[0].id)
+    }
+  }, [screens, hasLoadedData, isLoadingData, activeScreen, setActiveScreen])
+
   // Save project data functionality
   const saveProjectData = useCallback(async () => {
     if (!projectId) {
@@ -161,8 +181,27 @@ export function DesignMode({ projectId }: DesignModeProps) {
       return
     }
 
+    // Prevent multiple simultaneous saves
+    if (isSaving) {
+      console.log('Save already in progress, skipping...')
+      return
+    }
+
+    setIsSaving(true) // Set saving state
+    
+    // Add a timeout to prevent stuck saving state
+    const saveTimeout = setTimeout(() => {
+      console.warn('Save timeout reached, clearing saving state')
+      setIsSaving(false)
+    }, 10000) // 10 second timeout
+    
     try {
+      console.log('=== STARTING SAVE PROJECT DATA ===')
       console.log('Saving project data with', screens.length, 'screens')
+      console.log('Screens data:', screens)
+      console.log('Active screen:', activeScreen)
+      console.log('Screen positions:', screenPositions)
+      
       const designData = {
         screens, // Save screens to persist them
         activeScreen,
@@ -173,10 +212,25 @@ export function DesignMode({ projectId }: DesignModeProps) {
         screenPositions
       }
 
-      await ProjectService.saveProjectData(projectId, 'design', designData)
-      console.log('Project design data saved successfully')
+      console.log('Saving design data:', designData)
+      const result = await ProjectService.saveProjectData(projectId, 'design', designData)
+      console.log('Project design data saved successfully:', result)
+      console.log('=== SAVE PROJECT DATA COMPLETED ===')
     } catch (error) {
       console.error('Error saving project data:', error)
+    } finally {
+      clearTimeout(saveTimeout) // Clear the timeout
+      // Ensure saving state is cleared with a small delay to show the saved state
+      setTimeout(() => {
+        setIsSaving(false)
+        setSavedIndicator(true) // Show saved indicator
+        console.log('Save completed, clearing saving state')
+        
+        // Hide saved indicator after 2 seconds
+        setTimeout(() => {
+          setSavedIndicator(false)
+        }, 2000)
+      }, 500)
     }
   }, [projectId, screens, activeScreen, variables, zoom, pan, sidebarStates, screenPositions, isLoadingData])
 
@@ -193,30 +247,59 @@ export function DesignMode({ projectId }: DesignModeProps) {
       return
     }
 
+    console.log('=== STARTING LOAD PROJECT DATA ===')
+    console.log('Project ID:', projectId)
+    console.log('Current screens before load:', screens.length)
+    console.log('Current active screen:', activeScreen)
+    
     setIsLoadingData(true) // Set loading state to prevent saves
     try {
       console.log('Loading project data for projectId:', projectId)
       const designData = await ProjectService.getProjectData(projectId, 'design')
       
+      console.log('Raw design data from service:', designData)
+      
       if (designData && designData.data) {
         console.log('Found saved design data:', designData.data)
         const { screens: savedScreens, activeScreen: savedActiveScreen, variables: savedVariables, zoom: savedZoom, pan: savedPan, sidebarStates: savedSidebarStates, screenPositions: savedScreenPositions } = designData.data
         
-        // Only restore screens if they exist
+        console.log('Parsed saved screens:', savedScreens)
+        console.log('Saved active screen:', savedActiveScreen)
+        
+        // Always restore screens if they exist, regardless of current screens length
         if (savedScreens && Array.isArray(savedScreens) && savedScreens.length > 0) {
-          console.log('Restoring', savedScreens.length, 'screens')
+          console.log('Restoring', savedScreens.length, 'screens from saved data')
+          console.log('Current screens before restore:', screens.length)
+          
+          // Clear existing screens first to ensure clean state
+          screens.forEach(screen => {
+            console.log('Removing existing screen:', screen.name, screen.id)
+            deleteScreen(screen.id)
+          })
+          
+          // Add saved screens
           savedScreens.forEach((screen: Screen) => {
-            console.log('Adding screen:', screen.name, screen.id)
+            console.log('Adding saved screen:', screen.name, screen.id)
             addScreen(screen)
           })
+          
+          console.log('Screens restored successfully. New count:', screens.length + savedScreens.length)
+          
+          // Set active screen after a short delay to ensure screens are loaded
+          setTimeout(() => {
+            if (savedActiveScreen) {
+              console.log('Setting saved active screen after delay:', savedActiveScreen)
+              setActiveScreen(savedActiveScreen)
+            } else if (savedScreens.length > 0) {
+              console.log('Setting first screen as active after delay')
+              setActiveScreen(savedScreens[0].id)
+            }
+          }, 100)
+        } else {
+          console.log('No saved screens found in design data')
         }
         
         // Restore other state after screens are loaded
-        if (savedActiveScreen) {
-          console.log('Restoring active screen:', savedActiveScreen)
-          setActiveScreen(savedActiveScreen)
-        }
-        
         if (savedVariables) {
           console.log('Restoring variables')
           setVariables(savedVariables)
@@ -250,10 +333,13 @@ export function DesignMode({ projectId }: DesignModeProps) {
       console.error('Error loading project data:', error)
     } finally {
       console.log('Loading completed, clearing loading state')
+      console.log('Final screens count:', screens.length)
+      console.log('Final active screen:', activeScreen)
+      console.log('=== LOAD PROJECT DATA COMPLETED ===')
       setIsLoadingData(false) // Clear loading state
       setHasLoadedData(true) // Mark as loaded
     }
-  }, [projectId, addScreen, setActiveScreen, setVariables, setZoom, setPan, setSidebarStates, setScreenPositions])
+  }, [projectId, addScreen, setActiveScreen, setVariables, setZoom, setPan, setSidebarStates, setScreenPositions, screens, deleteScreen])
 
   // Auto-save functionality
   useEffect(() => {
@@ -269,37 +355,41 @@ export function DesignMode({ projectId }: DesignModeProps) {
 
   // Save when screens change - with guard to prevent infinite loop
   useEffect(() => {
-    if (projectId && screens.length > 0 && !isLoadingData) {
-      // Add a small delay to prevent immediate save after load
+    if (projectId && screens.length > 0 && !isLoadingData && !isSaving) {
+      // Add a longer delay to prevent rapid saves
       const timeoutId = setTimeout(() => {
         console.log('Screens changed, saving project data...')
         saveProjectData()
-      }, 3000) // 3 second delay
+      }, 10000) // 10 second delay to prevent rapid saves
 
       return () => clearTimeout(timeoutId)
     }
-  }, [projectId, screens, saveProjectData, isLoadingData])
+  }, [projectId, screens.length, saveProjectData, isLoadingData, isSaving]) // Use screens.length instead of screens to prevent unnecessary saves
 
   // Save when active screen changes
   useEffect(() => {
-    if (projectId && activeScreen && !isLoadingData) {
+    if (projectId && activeScreen && !isLoadingData && !isSaving) {
       console.log('Active screen changed, saving project data...')
       saveProjectData()
     }
-  }, [projectId, activeScreen, saveProjectData, isLoadingData])
+  }, [projectId, activeScreen, saveProjectData, isLoadingData, isSaving])
 
   // Save when screen positions change
   useEffect(() => {
-    if (projectId && Object.keys(screenPositions).length > 0 && !isLoadingData) {
+    if (projectId && Object.keys(screenPositions).length > 0 && !isLoadingData && !isSaving) {
       console.log('Screen positions changed, saving project data...')
       saveProjectData()
     }
-  }, [projectId, screenPositions, saveProjectData, isLoadingData])
+  }, [projectId, screenPositions, saveProjectData, isLoadingData, isSaving])
 
   // Load project data on mount - only once
   useEffect(() => {
     if (projectId) {
       console.log('Loading project data on mount for projectId:', projectId)
+      
+      // Reset loading states to ensure fresh load
+      setIsLoadingData(false)
+      setHasLoadedData(false)
       
       // Add timeout to prevent infinite loading
       const loadTimeout = setTimeout(() => {
@@ -310,7 +400,10 @@ export function DesignMode({ projectId }: DesignModeProps) {
         }
       }, 5000) // 5 second timeout
       
-      loadProjectData()
+      // Force load after a short delay to ensure context is ready
+      setTimeout(() => {
+        loadProjectData()
+      }, 100)
       
       return () => clearTimeout(loadTimeout)
     }
@@ -343,8 +436,10 @@ export function DesignMode({ projectId }: DesignModeProps) {
         console.log('Component modified, triggering save...')
         // Add a small delay to prevent rapid saves
         setTimeout(() => {
-          saveProjectData()
-        }, 500)
+          if (!isSaving && !isLoadingData) {
+            saveProjectData()
+          }
+        }, 2000) // 2 second delay to prevent rapid saves
       }
     }
   }
@@ -896,7 +991,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       // Handle screen dragging
       if (draggedScreen && screenDragOffset) {
         // Get the canvas container to calculate proper coordinates
-        const canvasContainer = document.querySelector('.flex-1.bg-gray-100.overflow-hidden.relative') as HTMLElement
+        const canvasContainer = containerRef.current
         if (canvasContainer) {
           const canvasRect = canvasContainer.getBoundingClientRect()
           
@@ -904,13 +999,9 @@ export function DesignMode({ projectId }: DesignModeProps) {
           const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
           const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
           
-          // Convert the visual offset to canvas coordinates
-          const canvasOffsetX = screenDragOffset.x / zoom
-          const canvasOffsetY = screenDragOffset.y / zoom
-          
           // Calculate new screen position by subtracting the offset from the mouse position
-          const newX = mouseX - canvasOffsetX
-          const newY = mouseY - canvasOffsetY
+          const newX = mouseX - screenDragOffset.x
+          const newY = mouseY - screenDragOffset.y
           
           // Get the default position for this screen using the helper function
           const index = screens.findIndex(s => s.id === draggedScreen)
@@ -921,10 +1012,19 @@ export function DesignMode({ projectId }: DesignModeProps) {
           const relativeX = newX - defaultX
           const relativeY = newY - defaultY
           
-          setScreenPositions(prev => ({
-            ...prev,
-            [draggedScreen]: { x: relativeX, y: relativeY }
-          }))
+          // Add some smoothing to prevent jumping
+          setScreenPositions(prev => {
+            const currentPos = prev[draggedScreen] || { x: 0, y: 0 }
+            const smoothFactor = 0.8 // Adjust this for more or less smoothing
+            
+            return {
+              ...prev,
+              [draggedScreen]: { 
+                x: currentPos.x * smoothFactor + relativeX * (1 - smoothFactor),
+                y: currentPos.y * smoothFactor + relativeY * (1 - smoothFactor)
+              }
+            }
+          })
         }
         
         document.body.style.cursor = 'grabbing'
@@ -1307,6 +1407,16 @@ export function DesignMode({ projectId }: DesignModeProps) {
   const handleMouseUp = () => {
     if (isDragging) {
       console.log('Mouse up - drag ended')
+      
+      // Trigger save when component drag ends
+      if (projectId && selectedComponent) {
+        console.log('Component moved, triggering save...')
+        setTimeout(() => {
+          if (!isSaving && !isLoadingData) {
+            saveProjectData()
+          }
+        }, 2000) // 2 second delay to prevent rapid saves
+      }
     }
     if (isDraggingComponent) {
       console.log('Cross-screen drag ended')
@@ -1386,15 +1496,27 @@ export function DesignMode({ projectId }: DesignModeProps) {
     e.stopPropagation()
     setDraggedScreen(screenId)
     
-    // Get the screen element to calculate offset relative to its actual visual position
-    const screenElement = e.currentTarget as HTMLElement
-    const screenRect = screenElement.getBoundingClientRect()
-    
-    // Calculate offset from mouse to the screen's top-left corner in page coordinates
-    const offsetX = e.clientX - screenRect.left
-    const offsetY = e.clientY - screenRect.top
+    // Get the canvas container to calculate offset relative to its actual visual position
+    const canvasContainer = containerRef.current
+    if (canvasContainer) {
+      const canvasRect = canvasContainer.getBoundingClientRect()
+      
+      // Calculate the screen's current position in canvas coordinates
+      const index = screens.findIndex(s => s.id === screenId)
+      const screen = screens[index]
+      const { defaultX, defaultY } = calculateScreenPosition(index, screen)
+      const screenPosition = screenPositions[screenId] || { x: 0, y: 0 }
+      const currentScreenX = defaultX + screenPosition.x
+      const currentScreenY = defaultY + screenPosition.y
+      
+      // Calculate offset from mouse to the screen's top-left corner in canvas coordinates
+      const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
+      const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
+      const offsetX = mouseX - currentScreenX
+      const offsetY = mouseY - currentScreenY
       
       setScreenDragOffset({ x: offsetX, y: offsetY })
+    }
   }
 
   // const handleScreenMouseMove = (e: React.MouseEvent) => {
@@ -2205,6 +2327,16 @@ export function DesignMode({ projectId }: DesignModeProps) {
     
     setSelectedComponent(newComponent)
     console.log('Component added successfully')
+    
+    // Trigger save when component is added
+    if (projectId) {
+      console.log('Component added, triggering save...')
+      setTimeout(() => {
+        if (!isSaving && !isLoadingData) {
+          saveProjectData()
+        }
+      }, 5000) // 5 second delay to prevent rapid saves
+    }
   }
 
   // Toggle sidebar sections
@@ -2278,6 +2410,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
             const currentX = mouseX - screenLeft
             const currentY = mouseY - screenTop
             
+            
             const deltaX = currentX - resizeStartPos.x
             const deltaY = currentY - resizeStartPos.y
             
@@ -2347,6 +2480,16 @@ export function DesignMode({ projectId }: DesignModeProps) {
   const handleResizeEnd = () => {
     setIsResizing(false)
     setResizeHandle(null)
+    
+    // Trigger save when component resize ends
+    if (projectId && selectedComponent) {
+      console.log('Component resized, triggering save...')
+      setTimeout(() => {
+        if (!isSaving && !isLoadingData) {
+          saveProjectData()
+        }
+      }, 2000) // 2 second delay to prevent rapid saves
+    }
   }
 
   // Drag from library handlers
@@ -2569,6 +2712,16 @@ export function DesignMode({ projectId }: DesignModeProps) {
     }
     setIsDraggingFromLibrary(false)
     setDraggedComponentType(null)
+    
+    // Trigger save when component is dropped
+    if (projectId) {
+      console.log('Component dropped, triggering save...')
+      setTimeout(() => {
+        if (!isSaving && !isLoadingData) {
+          saveProjectData()
+        }
+      }, 3000) // 3 second delay to prevent rapid saves
+    }
   }
 
   const handleScreenDragOver = (e: React.DragEvent) => {
@@ -2826,21 +2979,49 @@ export function DesignMode({ projectId }: DesignModeProps) {
     addScreen(newScreen)
     setActiveScreen(newScreen.id)
     
-    // Calculate position for the new screen to be visible on canvas
-    const existingScreens = screens.length
-    const baseX = 200 // Start from a visible position
-    const baseY = 200
-    const spacing = 50 // Space between screens
+    // Calculate position for the new screen beside the current active screen
+    let newPosition = { x: 200, y: 200 } // Default position if no active screen
     
-    // Position new screen with offset based on existing screens
-    const newPosition = {
-      x: baseX + (existingScreens * spacing),
-      y: baseY + (existingScreens * spacing)
+    if (activeScreen && screens.length > 0) {
+      // Find the currently active screen
+      const currentActiveScreen = screens.find(s => s.id === activeScreen)
+      if (currentActiveScreen) {
+        // Get the current active screen's position
+        const currentScreenPosition = screenPositions[activeScreen] || { x: 0, y: 0 }
+        const currentScreenIndex = screens.findIndex(s => s.id === activeScreen)
+        const { defaultX: currentDefaultX, defaultY: currentDefaultY } = calculateScreenPosition(currentScreenIndex, currentActiveScreen)
+        
+        // Calculate the actual position of the current active screen
+        const currentScreenX = currentDefaultX + currentScreenPosition.x
+        const currentScreenY = currentDefaultY + currentScreenPosition.y
+        
+        // Position the new screen to the right of the current active screen
+        const spacing = 50 // Space between screens
+        newPosition = {
+          x: currentScreenX + currentActiveScreen.width + spacing,
+          y: currentScreenY
+        }
+        
+        // If the new position would be too far to the right, position it below
+        const maxX = 1200 // Maximum X position before wrapping
+        if (newPosition.x > maxX) {
+          newPosition = {
+            x: currentScreenX,
+            y: currentScreenY + currentActiveScreen.height + spacing
+          }
+        }
+        
+        console.log('Positioning new screen beside active screen:', {
+          currentScreen: currentActiveScreen.name,
+          currentPosition: { x: currentScreenX, y: currentScreenY },
+          newPosition: newPosition
+        })
+      }
     }
     
     // Set initial position for the new screen
-      setScreenPositions(prev => ({
-        ...prev,
+    setScreenPositions(prev => ({
+      ...prev,
       [newScreen.id]: newPosition
     }))
     
@@ -2867,6 +3048,16 @@ export function DesignMode({ projectId }: DesignModeProps) {
     setTimeout(() => {
       console.log('Screen creation completed, resetting flag')
       setIsCreatingScreen(false)
+      
+      // Trigger save when screen is created
+      if (projectId) {
+        console.log('Screen created, triggering save...')
+        setTimeout(() => {
+          if (!isSaving && !isLoadingData) {
+            saveProjectData()
+          }
+        }, 5000) // 5 second delay to prevent rapid saves
+      }
     }, 100)
   }
 
@@ -2995,6 +3186,23 @@ export function DesignMode({ projectId }: DesignModeProps) {
                                 </svg>
                               </button>
                             </div>
+                            
+                            {/* Helpful message about positioning */}
+                            {activeScreen && screens.length > 0 && (
+                              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                                <div className="flex items-center space-x-2">
+                                  <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  <div className="text-xs text-blue-700">
+                                    <div className="font-medium">New screen will be positioned beside:</div>
+                                    <div className="text-blue-600">
+                                      {screens.find(s => s.id === activeScreen)?.name || 'Active screen'}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
                             
                             <div className="space-y-4 max-h-96 overflow-y-auto">
                               {/* iOS Devices */}
@@ -3210,22 +3418,28 @@ export function DesignMode({ projectId }: DesignModeProps) {
                             <div className="flex items-center justify-between">
                               <div className="flex-1 min-w-0">
                                 {/* Screen Name with Inline Editing */}
-                                <div className="flex items-center space-x-2">
+                                <div className="flex items-center space-x-2 mb-2">
+                                  {/* Active Screen Indicator */}
+                                  {activeScreen === screen.id && (
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                                  )}
+                                  
                                   <div className="flex-1 min-w-0">
                                     <input
                                       type="text"
                                       value={screen.name}
                                       onChange={(e) => updateScreen(screen.id, { name: e.target.value })}
-                                      className={`w-full text-sm font-medium bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white px-2 py-1 rounded min-w-0 ${
-                                        activeScreen === screen.id ? 'text-blue-700' : 'text-gray-700'
+                                      className={`w-full text-sm font-medium bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white px-2 py-1 rounded min-w-0 truncate ${
+                                        activeScreen === screen.id ? 'text-blue-700 font-semibold' : 'text-gray-900'
                                       }`}
                                       onClick={(e) => e.stopPropagation()}
                                       onDoubleClick={(e) => e.stopPropagation()}
+                                      placeholder="Screen name"
                                     />
                                   </div>
                                   
                                   {/* Screen Type Badge */}
-                                  <span className={`px-2 py-1 text-xs rounded-full capitalize ${
+                                  <span className={`px-2 py-1 text-xs rounded-full capitalize flex-shrink-0 ${
                                     screen.type === 'mobile' ? 'bg-blue-100 text-blue-700' :
                                     screen.type === 'tablet' ? 'bg-green-100 text-green-700' :
                                     screen.type === 'desktop' ? 'bg-purple-100 text-purple-700' :
@@ -3233,10 +3447,17 @@ export function DesignMode({ projectId }: DesignModeProps) {
                                   }`}>
                                     {screen.type}
                                   </span>
-                                  
-                                  {/* Screen Dimensions */}
+                                </div>
+                                
+                                {/* Screen Dimensions */}
+                                <div className="flex items-center justify-between">
                                   <span className="text-xs text-gray-500">
                                     {screen.width}×{screen.height}
+                                  </span>
+                                  
+                                  {/* Component Count */}
+                                  <span className="text-xs text-gray-400">
+                                    {screen.layers.reduce((total, layer) => total + layer.components.length, 0)} components
                                   </span>
                                 </div>
                                 
@@ -3746,16 +3967,45 @@ export function DesignMode({ projectId }: DesignModeProps) {
             <div className="h-4 w-px bg-gray-300"></div>
             <button 
               onClick={manualSave}
-              className="text-sm text-gray-600 hover:text-gray-900 flex items-center space-x-1"
+              disabled={isSaving}
+              className={`text-sm flex items-center space-x-1 ${
+                isSaving 
+                  ? 'text-gray-400 cursor-not-allowed' 
+                  : savedIndicator
+                  ? 'text-green-600 cursor-default'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
               title="Save project (Ctrl+S)"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-              </svg>
-              <span>Save</span>
+              {isSaving ? (
+                <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              ) : savedIndicator ? (
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+              )}
+              <span>{isSaving ? 'Saving...' : savedIndicator ? 'Saved!' : 'Save'}</span>
             </button>
             <button className="text-sm text-gray-600 hover:text-gray-900">Undo</button>
             <button className="text-sm text-gray-600 hover:text-gray-900">Redo</button>
+            <button 
+              onClick={() => {
+                console.log('Force reload triggered')
+                setHasLoadedData(false)
+                setIsLoadingData(false)
+                loadProjectData()
+              }}
+              className="text-sm text-red-600 hover:text-red-800"
+              title="Force reload project data (debug)"
+            >
+              Reload
+            </button>
           </div>
         </div>
         {/* Canvas Area with Figma-style background */}
