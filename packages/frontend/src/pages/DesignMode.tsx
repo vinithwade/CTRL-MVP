@@ -28,6 +28,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Maximize2,
+  Square,
   
   
   
@@ -68,15 +69,19 @@ export function DesignMode({ projectId }: DesignModeProps) {
   const { navigateToMode } = useNavigation()
   const { 
     screens, 
-    activeScreen, 
-    addComponent, 
-    updateComponent, 
-    deleteComponent, 
     addScreen, 
     updateScreen, 
     deleteScreen, 
-    setActiveScreen 
+    activeScreen, 
+    setActiveScreen,
+    addComponent,
+    updateComponent,
+    deleteComponent
   } = useDesign()
+  
+  // Add state for project information
+  const [projectInfo, setProjectInfo] = useState<{ name: string; language: string; device: string } | null>(null)
+  const [loadingProject, setLoadingProject] = useState(false)
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
@@ -145,7 +150,8 @@ export function DesignMode({ projectId }: DesignModeProps) {
 
     try {
       const designData = {
-        screens,
+        // Don't save screens - only save user-created screens
+        // screens,
         activeScreen,
         variables,
         zoom,
@@ -159,7 +165,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
     } catch (error) {
       console.error('Error saving project data:', error)
     }
-  }, [projectId, screens, activeScreen, variables, zoom, pan, sidebarStates, screenPositions])
+  }, [projectId, activeScreen, variables, zoom, pan, sidebarStates, screenPositions])
 
   // Load project data functionality
   const loadProjectData = useCallback(async () => {
@@ -174,12 +180,13 @@ export function DesignMode({ projectId }: DesignModeProps) {
       if (designData && designData.data) {
         const { screens: savedScreens, activeScreen: savedActiveScreen, variables: savedVariables, zoom: savedZoom, pan: savedPan, sidebarStates: savedSidebarStates, screenPositions: savedScreenPositions } = designData.data
         
-        // Restore design state
-        if (savedScreens) {
-          savedScreens.forEach((screen: Screen) => {
-            addScreen(screen)
-          })
-        }
+        // Restore design state - only if screens array is empty to prevent duplicates
+        // Don't load saved screens - only show user-created screens
+        // if (savedScreens && screens.length === 0) {
+        //   savedScreens.forEach((screen: Screen) => {
+        //     addScreen(screen)
+        //   })
+        // }
         
         if (savedActiveScreen) {
           setActiveScreen(savedActiveScreen)
@@ -210,7 +217,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
     } catch (error) {
       console.error('Error loading project data:', error)
     }
-  }, [projectId, addScreen, setActiveScreen])
+  }, [projectId, addScreen, setActiveScreen, screens.length])
 
   // Auto-save functionality
   useEffect(() => {
@@ -223,12 +230,12 @@ export function DesignMode({ projectId }: DesignModeProps) {
     }
   }, [projectId, saveProjectData])
 
-  // Load project data on mount
+  // Load project data on mount - only once
   useEffect(() => {
-    if (projectId) {
+    if (projectId && screens.length === 0) {
       loadProjectData()
     }
-  }, [projectId, loadProjectData])
+  }, [projectId]) // Remove loadProjectData from dependencies
 
   // Local update function that ensures proper synchronization
   const updateComponentLocal = (componentId: string, updates: Partial<Component>) => {
@@ -468,11 +475,241 @@ export function DesignMode({ projectId }: DesignModeProps) {
   }
 
   const screenPresets = [
-    { name: 'iPhone 14', width: 393, height: 852, type: 'mobile' as const, icon: Smartphone },
-    { name: 'iPad', width: 768, height: 1024, type: 'tablet' as const, icon: Tablet },
-    { name: 'Desktop', width: 1200, height: 800, type: 'desktop' as const, icon: Monitor },
-    { name: 'Large Desktop', width: 1440, height: 900, type: 'desktop' as const, icon: Monitor },
-    { name: 'Custom', width: 800, height: 600, type: 'custom' as const, icon: Layout }
+    // iOS Devices
+    { 
+      name: 'iPhone 15 Pro Max', 
+      width: 430, 
+      height: 932, 
+      type: 'mobile' as const, 
+      icon: Smartphone,
+      description: 'iOS 6.7" display',
+      ratio: '19.5:9',
+      category: 'iOS'
+    },
+    { 
+      name: 'iPhone 15 Pro', 
+      width: 393, 
+      height: 852, 
+      type: 'mobile' as const, 
+      icon: Smartphone,
+      description: 'iOS 6.1" display',
+      ratio: '19.5:9',
+      category: 'iOS'
+    },
+    { 
+      name: 'iPhone 15', 
+      width: 393, 
+      height: 852, 
+      type: 'mobile' as const, 
+      icon: Smartphone,
+      description: 'iOS 6.1" display',
+      ratio: '19.5:9',
+      category: 'iOS'
+    },
+    { 
+      name: 'iPhone 15 Plus', 
+      width: 430, 
+      height: 932, 
+      type: 'mobile' as const, 
+      icon: Smartphone,
+      description: 'iOS 6.7" display',
+      ratio: '19.5:9',
+      category: 'iOS'
+    },
+    { 
+      name: 'iPhone 14', 
+      width: 390, 
+      height: 844, 
+      type: 'mobile' as const, 
+      icon: Smartphone,
+      description: 'iOS 6.1" display',
+      ratio: '19.5:9',
+      category: 'iOS'
+    },
+    { 
+      name: 'iPhone SE', 
+      width: 375, 
+      height: 667, 
+      type: 'mobile' as const, 
+      icon: Smartphone,
+      description: 'iOS 4.7" display',
+      ratio: '16:9',
+      category: 'iOS'
+    },
+    { 
+      name: 'iPad Pro 12.9"', 
+      width: 1024, 
+      height: 1366, 
+      type: 'tablet' as const, 
+      icon: Tablet,
+      description: 'iOS 12.9" display',
+      ratio: '4:3',
+      category: 'iOS'
+    },
+    { 
+      name: 'iPad Pro 11"', 
+      width: 834, 
+      height: 1194, 
+      type: 'tablet' as const, 
+      icon: Tablet,
+      description: 'iOS 11" display',
+      ratio: '4:3',
+      category: 'iOS'
+    },
+    { 
+      name: 'iPad Air', 
+      width: 820, 
+      height: 1180, 
+      type: 'tablet' as const, 
+      icon: Tablet,
+      description: 'iOS 10.9" display',
+      ratio: '4:3',
+      category: 'iOS'
+    },
+    { 
+      name: 'iPad mini', 
+      width: 744, 
+      height: 1133, 
+      type: 'tablet' as const, 
+      icon: Tablet,
+      description: 'iOS 8.3" display',
+      ratio: '4:3',
+      category: 'iOS'
+    },
+    
+    // Android Devices
+    { 
+      name: 'Samsung Galaxy S24 Ultra', 
+      width: 412, 
+      height: 892, 
+      type: 'mobile' as const, 
+      icon: Smartphone,
+      description: 'Android 6.8" display',
+      ratio: '19.3:9',
+      category: 'Android'
+    },
+    { 
+      name: 'Samsung Galaxy S24+', 
+      width: 393, 
+      height: 852, 
+      type: 'mobile' as const, 
+      icon: Smartphone,
+      description: 'Android 6.7" display',
+      ratio: '19.5:9',
+      category: 'Android'
+    },
+    { 
+      name: 'Samsung Galaxy S24', 
+      width: 360, 
+      height: 780, 
+      type: 'mobile' as const, 
+      icon: Smartphone,
+      description: 'Android 6.2" display',
+      ratio: '19.5:9',
+      category: 'Android'
+    },
+    { 
+      name: 'Google Pixel 8 Pro', 
+      width: 412, 
+      height: 892, 
+      type: 'mobile' as const, 
+      icon: Smartphone,
+      description: 'Android 6.7" display',
+      ratio: '19.3:9',
+      category: 'Android'
+    },
+    { 
+      name: 'Google Pixel 8', 
+      width: 393, 
+      height: 852, 
+      type: 'mobile' as const, 
+      icon: Smartphone,
+      description: 'Android 6.2" display',
+      ratio: '19.5:9',
+      category: 'Android'
+    },
+    { 
+      name: 'OnePlus 12', 
+      width: 412, 
+      height: 892, 
+      type: 'mobile' as const, 
+      icon: Smartphone,
+      description: 'Android 6.8" display',
+      ratio: '19.3:9',
+      category: 'Android'
+    },
+    { 
+      name: 'Samsung Galaxy Tab S9 Ultra', 
+      width: 1024, 
+      height: 1366, 
+      type: 'tablet' as const, 
+      icon: Tablet,
+      description: 'Android 14.6" display',
+      ratio: '4:3',
+      category: 'Android'
+    },
+    { 
+      name: 'Samsung Galaxy Tab S9+', 
+      width: 834, 
+      height: 1194, 
+      type: 'tablet' as const, 
+      icon: Tablet,
+      description: 'Android 12.4" display',
+      ratio: '4:3',
+      category: 'Android'
+    },
+    { 
+      name: 'Samsung Galaxy Tab S9', 
+      width: 820, 
+      height: 1180, 
+      type: 'tablet' as const, 
+      icon: Tablet,
+      description: 'Android 11" display',
+      ratio: '4:3',
+      category: 'Android'
+    },
+    
+    // Desktop & Custom
+    { 
+      name: 'Desktop', 
+      width: 1440, 
+      height: 900, 
+      type: 'desktop' as const, 
+      icon: Monitor,
+      description: 'Standard desktop',
+      ratio: '16:10',
+      category: 'Desktop'
+    },
+    { 
+      name: 'Large Desktop', 
+      width: 1920, 
+      height: 1080, 
+      type: 'desktop' as const, 
+      icon: Monitor,
+      description: 'Full HD desktop',
+      ratio: '16:9',
+      category: 'Desktop'
+    },
+    { 
+      name: 'Ultra Wide', 
+      width: 2560, 
+      height: 1080, 
+      type: 'desktop' as const, 
+      icon: Monitor,
+      description: 'Ultra-wide desktop',
+      ratio: '21:9',
+      category: 'Desktop'
+    },
+    { 
+      name: 'Custom', 
+      width: 400, 
+      height: 600, 
+      type: 'custom' as const, 
+      icon: Square,
+      description: 'Custom dimensions',
+      ratio: '2:3',
+      category: 'Custom'
+    }
   ]
 
   // Keyboard shortcuts for mode switching
@@ -575,12 +812,10 @@ export function DesignMode({ projectId }: DesignModeProps) {
           return Math.max(0.1, Math.min(5, newZoom))
         })
       } else {
-        // Pan with trackpad (two-finger scroll)
-        // Use deltaY for vertical pan and deltaX for horizontal pan
-        const panSpeed = 0.8 // Slightly slower for more precise control
+        // Trackpad panning (two-finger scroll)
         setPan(prev => ({
-          x: prev.x - (e.deltaX * panSpeed),
-          y: prev.y - (e.deltaY * panSpeed)
+          x: prev.x - e.deltaX,
+          y: prev.y - e.deltaY
         }))
       }
     }
@@ -2360,32 +2595,30 @@ export function DesignMode({ projectId }: DesignModeProps) {
   }
 
   // Calculate dynamic canvas size based on number of screens
-  const calculateCanvasSize = () => {
+  const calculateCanvasSize = (): { width: string; height: string } => {
     if (screens.length === 0) {
-      return { width: '100vw', height: '100vh' }
+      return { width: '2000px', height: '2000px' }
     }
-    
-    // Calculate grid layout
-    const columns = 2 // 2 columns as per current layout
-    const rows = Math.ceil(screens.length / columns)
-    
-    // Use consistent grid cell size based on maximum screen dimensions
-    const maxScreenWidth = Math.max(...screens.map(s => s.width || 400))
-    const maxScreenHeight = Math.max(...screens.map(s => s.height || 600))
-    const gapX = 32 // Gap between screens horizontally
-    const gapY = 32 // Gap between screens vertically
-    const padding = 64 // Padding around the entire canvas
-    
-    const cellWidth = maxScreenWidth + gapX
-    const cellHeight = maxScreenHeight + gapY
-    
-    // Calculate total canvas dimensions
-    const totalWidth = columns * cellWidth + padding * 2
-    const totalHeight = rows * cellHeight + padding * 2
-    
+
+    // Calculate canvas size based on screen positions like logic mode
+    let minX = 0, minY = 0, maxX = 0, maxY = 0
+
+    screens.forEach(screen => {
+      const screenPosition = screenPositions[screen.id] || { x: 100, y: 100 }
+      const screenRight = screenPosition.x + screen.width
+      const screenBottom = screenPosition.y + screen.height
+
+      minX = Math.min(minX, screenPosition.x)
+      minY = Math.min(minY, screenPosition.y)
+      maxX = Math.max(maxX, screenRight)
+      maxY = Math.max(maxY, screenBottom)
+    })
+
+    // Add padding around all screens
+    const padding = 200
     return {
-      width: `${Math.max(totalWidth, window.innerWidth)}px`,
-      height: `${Math.max(totalHeight, window.innerHeight)}px`
+      width: `${Math.max(2000, maxX - minX + padding * 2)}px`,
+      height: `${Math.max(2000, maxY - minY + padding * 2)}px`
     }
   }
 
@@ -2452,13 +2685,8 @@ export function DesignMode({ projectId }: DesignModeProps) {
       }
     }
 
-    if (showScreenSelector) {
       document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showScreenSelector])
 
   // Global mouse event handlers for dragging and resizing
@@ -2510,42 +2738,109 @@ export function DesignMode({ projectId }: DesignModeProps) {
   const MIN_HEIGHT = 20;
 
   // Helper function to automatically position new screens beside the current active screen
+  const [isCreatingScreen, setIsCreatingScreen] = useState(false)
+  
   const createScreenWithPosition = (screenData: Partial<Screen>) => {
+    // Prevent multiple rapid screen creations
+    if (isCreatingScreen) {
+      console.log('Screen creation already in progress, skipping...')
+      return
+    }
+    
+    console.log('Creating new screen:', screenData.name)
+    setIsCreatingScreen(true)
+    
+    const timestamp = Date.now()
     const newScreen: Screen = {
-      id: Date.now().toString(),
-      name: screenData.name || `Screen ${screens.length + 1}`,
+      id: timestamp.toString(),
+      name: screenData.name || `Screen ${timestamp}`,
       width: screenData.width || 1200,
       height: screenData.height || 800,
       type: screenData.type || 'custom',
       layers: [
         {
-          id: Date.now().toString() + '_layer',
+          id: timestamp.toString() + '_layer',
           name: 'Main Layout',
           visible: true,
           locked: false,
           components: []
         }
       ],
-      activeLayer: Date.now().toString() + '_layer'
+      activeLayer: timestamp.toString() + '_layer'
     }
     
-    // Add the screen first
+    console.log('Adding screen to context:', newScreen.id)
+    // Add the screen and set it as active immediately
     addScreen(newScreen)
+    setActiveScreen(newScreen.id)
     
-    // Then position it beside the current active screen
-    setTimeout(() => {
-      const newScreenIndex = screens.length // This will be the index of the new screen
-      
-      // Set the position for the new screen (positioning is handled by calculateScreenPosition)
+    // Calculate position for the new screen to be visible on canvas
+    const existingScreens = screens.length
+    const baseX = 200 // Start from a visible position
+    const baseY = 200
+    const spacing = 50 // Space between screens
+    
+    // Position new screen with offset based on existing screens
+    const newPosition = {
+      x: baseX + (existingScreens * spacing),
+      y: baseY + (existingScreens * spacing)
+    }
+    
+    // Set initial position for the new screen
       setScreenPositions(prev => ({
         ...prev,
-        [newScreen.id]: { x: 0, y: 0 }
-      }))
-      
-      // Set the new screen as active
-      setActiveScreen(newScreen.id)
-    }, 0)
+      [newScreen.id]: newPosition
+    }))
+    
+    // Center the view on the new screen to ensure it's visible
+    setTimeout(() => {
+      const canvasContainer = containerRef.current
+      if (canvasContainer) {
+        const containerRect = canvasContainer.getBoundingClientRect()
+        const centerX = containerRect.width / 2
+        const centerY = containerRect.height / 2
+        
+        // Calculate pan to center the new screen
+        const targetPanX = centerX - (newPosition.x + newScreen.width / 2) * zoom
+        const targetPanY = centerY - (newPosition.y + newScreen.height / 2) * zoom
+        
+        setPan({
+          x: targetPanX,
+          y: targetPanY
+        })
+      }
+    }, 50)
+    
+    // Reset the flag after a short delay
+    setTimeout(() => {
+      console.log('Screen creation completed, resetting flag')
+      setIsCreatingScreen(false)
+    }, 100)
   }
+
+  // Fetch project information
+  const fetchProjectInfo = useCallback(async () => {
+    if (!projectId) return
+    
+    setLoadingProject(true)
+    try {
+      const projectData = await ProjectService.getProjectWithData(projectId)
+      setProjectInfo({
+        name: projectData.project.name,
+        language: projectData.project.language,
+        device: projectData.project.device
+      })
+    } catch (error) {
+      console.error('Error fetching project info:', error)
+    } finally {
+      setLoadingProject(false)
+    }
+  }, [projectId])
+  
+  // Load project info on mount
+  useEffect(() => {
+    fetchProjectInfo()
+  }, [fetchProjectInfo])
 
   return (
     <div className="h-screen flex bg-gray-50 font-['Inter'] font-semibold">
@@ -2560,10 +2855,18 @@ export function DesignMode({ projectId }: DesignModeProps) {
                 <span className="text-xs font-bold text-white">C</span>
               </div>
               <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">Untitled</div>
-                <div className="text-xs text-gray-500">Drafts</div>
+                <div className="text-sm font-medium text-gray-900">
+                  {loadingProject ? 'Loading...' : (projectInfo?.name || 'Untitled')}
               </div>
-              <button className="text-gray-400 hover:text-gray-600">
+                <div className="text-xs text-gray-500">
+                  {projectInfo ? `${projectInfo.language} • ${projectInfo.device}` : 'Drafts'}
+                </div>
+              </div>
+              <button 
+                onClick={() => setSidebarVisible(false)}
+                className="text-gray-400 hover:text-gray-600"
+                title="Hide sidebar"
+              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -2593,17 +2896,6 @@ export function DesignMode({ projectId }: DesignModeProps) {
                 Assets
               </button>
             </div>
-            
-            {/* Back to Dashboard Button */}
-            <button
-              onClick={() => navigate('/user-dashboard')}
-              className="mt-3 w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg flex items-center justify-center space-x-2 transition-colors"
-            >
-              <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-              </svg>
-              <span>Back to Dashboard</span>
-            </button>
           </div>
 
           {/* Content Area */}
@@ -2617,40 +2909,81 @@ export function DesignMode({ projectId }: DesignModeProps) {
                     <div className="relative">
                       <button 
                         onClick={() => setShowScreenSelector(!showScreenSelector)}
-                        className="text-gray-400 hover:text-gray-600 p-1 rounded"
+                        className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 shadow-sm hover:shadow-md screen-selector"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
+                        <span>Add Screen</span>
                       </button>
                       
                       {/* Screen Type Selector Dropdown */}
                       {showScreenSelector && (
-                        <div className="absolute right-0 top-8 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                          <div className="p-2">
-                            <div className="text-xs font-medium text-gray-700 mb-2 px-2">Choose Screen Type</div>
+                        <div className="fixed left-64 top-20 w-80 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden screen-selector">
+                          <div className="p-4">
+                            <div className="flex items-center justify-between mb-4">
+                              <h3 className="text-sm font-medium text-gray-900">Add Screen</h3>
+                              <button
+                                onClick={() => setShowScreenSelector(false)}
+                                className="text-gray-400 hover:text-gray-600 p-1 rounded"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </div>
                             
-                            {/* Custom Screen */}
+                            <div className="space-y-4 max-h-96 overflow-y-auto">
+                              {/* iOS Devices */}
+                              <div>
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                                  <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">iOS</h4>
+                                </div>
+                                <div className="space-y-1">
+                                  {screenPresets.filter(preset => preset.category === 'iOS').map((preset) => (
                             <button
+                                      key={preset.name}
+                                      className="w-full text-left p-2 hover:bg-gray-50 rounded text-xs"
                               onClick={() => {
                                 createScreenWithPosition({
-                                  name: `Screen ${screens.length + 1}`,
-                                  width: 1200,
-                                  height: 800,
-                                  type: 'custom'
+                                          name: preset.name,
+                                          width: preset.width,
+                                          height: preset.height,
+                                          type: preset.type
                                 })
                                 setShowScreenSelector(false)
                               }}
-                              className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center space-x-2"
-                            >
-                              <div className="w-4 h-4 bg-gray-200 rounded"></div>
-                              <span>Custom Screen</span>
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                          <preset.icon className="w-4 h-4 text-gray-500" />
+                                          <div>
+                                            <div className="font-medium text-gray-900">{preset.name}</div>
+                                            <div className="text-gray-500">{preset.description}</div>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-gray-500">{preset.width}×{preset.height}</div>
+                                          <div className="text-gray-400">{preset.ratio}</div>
+                                        </div>
+                                      </div>
                             </button>
-                            
-                            {/* Preset Screens */}
-                            {screenPresets.map((preset) => (
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Android Devices */}
+                              <div>
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                                  <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Android</h4>
+                                </div>
+                                <div className="space-y-1">
+                                  {screenPresets.filter(preset => preset.category === 'Android').map((preset) => (
                               <button
                                 key={preset.name}
+                                      className="w-full text-left p-2 hover:bg-gray-50 rounded text-xs"
                                 onClick={() => {
                                   createScreenWithPosition({
                                     name: preset.name,
@@ -2660,13 +2993,103 @@ export function DesignMode({ projectId }: DesignModeProps) {
                                   })
                                   setShowScreenSelector(false)
                                 }}
-                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md flex items-center space-x-2"
                               >
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
                                 <preset.icon className="w-4 h-4 text-gray-500" />
-                                <span>{preset.name}</span>
-                                <span className="text-xs text-gray-400 ml-auto">{preset.width}×{preset.height}</span>
+                                          <div>
+                                            <div className="font-medium text-gray-900">{preset.name}</div>
+                                            <div className="text-gray-500">{preset.description}</div>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-gray-500">{preset.width}×{preset.height}</div>
+                                          <div className="text-gray-400">{preset.ratio}</div>
+                                        </div>
+                                      </div>
                               </button>
                             ))}
+                                </div>
+                              </div>
+
+                              {/* Desktop */}
+                              <div>
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
+                                  <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Desktop</h4>
+                                </div>
+                                <div className="space-y-1">
+                                  {screenPresets.filter(preset => preset.category === 'Desktop').map((preset) => (
+                                    <button
+                                      key={preset.name}
+                                      className="w-full text-left p-2 hover:bg-gray-50 rounded text-xs"
+                                      onClick={() => {
+                                        createScreenWithPosition({
+                                          name: preset.name,
+                                          width: preset.width,
+                                          height: preset.height,
+                                          type: preset.type
+                                        })
+                                        setShowScreenSelector(false)
+                                      }}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                          <preset.icon className="w-4 h-4 text-gray-500" />
+                                          <div>
+                                            <div className="font-medium text-gray-900">{preset.name}</div>
+                                            <div className="text-gray-500">{preset.description}</div>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-gray-500">{preset.width}×{preset.height}</div>
+                                          <div className="text-gray-400">{preset.ratio}</div>
+                                        </div>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Custom */}
+                              <div>
+                                <div className="flex items-center space-x-2 mb-2">
+                                  <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                                  <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Custom</h4>
+                                </div>
+                                <div className="space-y-1">
+                                  {screenPresets.filter(preset => preset.category === 'Custom').map((preset) => (
+                                    <button
+                                      key={preset.name}
+                                      className="w-full text-left p-2 hover:bg-gray-50 rounded text-xs"
+                                      onClick={() => {
+                                        createScreenWithPosition({
+                                          name: preset.name,
+                                          width: preset.width,
+                                          height: preset.height,
+                                          type: preset.type
+                                        })
+                                        setShowScreenSelector(false)
+                                      }}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                          <preset.icon className="w-4 h-4 text-gray-500" />
+                                          <div>
+                                            <div className="font-medium text-gray-900">{preset.name}</div>
+                                            <div className="text-gray-500">{preset.description}</div>
+                                          </div>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-gray-500">{preset.width}×{preset.height}</div>
+                                          <div className="text-gray-400">{preset.ratio}</div>
+                                        </div>
+                                      </div>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -2697,7 +3120,11 @@ export function DesignMode({ projectId }: DesignModeProps) {
                                 ? 'ring-2 ring-blue-500 border-blue-300 bg-blue-50' 
                                 : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                             }`}
-                            onClick={() => setActiveScreen(screen.id)}
+                            onClick={() => {
+                              if (!isPanning && !draggedScreen) {
+                                setActiveScreen(screen.id)
+                              }
+                            }}
                             onDoubleClick={() => {
                               // Navigate to the screen on canvas
                               const canvasContainer = document.querySelector('.flex-1.bg-gray-100.overflow-hidden.relative') as HTMLElement
@@ -3148,34 +3575,53 @@ export function DesignMode({ projectId }: DesignModeProps) {
               </div>
             )}
           </div>
+          
+          {/* Back to Dashboard Button - Bottom */}
+          <div className="p-4 border-t border-gray-200">
+            <button
+              onClick={() => navigate('/user-dashboard')}
+              className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg flex items-center justify-center space-x-2 transition-colors"
+            >
+              <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+              </svg>
+              <span>Back to Dashboard</span>
+            </button>
+          </div>
         </div>
       )}
 
       {/* Main Canvas Area */}
       <div className="flex-1 bg-gray-100 overflow-hidden relative">
-        {/* Sidebar Toggle Button */}
-        <button
-          onClick={() => setSidebarVisible(!sidebarVisible)}
-          className="absolute top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow"
-          title={sidebarVisible ? "Hide sidebar" : "Show sidebar"}
-        >
-          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
-
         {/* Canvas Toolbar */}
         <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4">
           <div className="flex items-center space-x-4">
-            {/* Show Sidebar Button (when hidden) */}
+            {/* Show Sidebar Button and Project Name (when hidden) */}
             {!sidebarVisible && (
+              <div className="flex items-center space-x-3">
               <button
                 onClick={() => setSidebarVisible(true)}
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
                 title="Show sidebar"
               >
-                <ChevronRight className="h-4 w-4" />
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
             </button>
+                <div className="flex items-center space-x-2">
+                  <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-xs font-bold text-white">C</span>
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {loadingProject ? 'Loading...' : (projectInfo?.name || 'Untitled')}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {projectInfo ? `${projectInfo.language} • ${projectInfo.device}` : 'Drafts'}
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
             <span className="text-sm text-gray-600">
               {screens.length} Screens • Active: {currentScreen?.name} ({currentScreen?.width}x{currentScreen?.height})
@@ -3243,12 +3689,8 @@ export function DesignMode({ projectId }: DesignModeProps) {
         <div 
           ref={containerRef}
           className="flex-1 bg-gray-100 overflow-hidden relative"
-          onMouseDown={handleMouseDownPan}
-          onMouseMove={handleMouseMovePan}
-          onMouseUp={handleMouseUpPan}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
           style={{ 
+            height: 'calc(100vh - 48px)', // Subtract toolbar height
             cursor: isPanning ? 'grabbing' : 'grab',
             touchAction: 'none',
             userSelect: 'none',
@@ -3256,11 +3698,16 @@ export function DesignMode({ projectId }: DesignModeProps) {
             MozUserSelect: 'none',
             msUserSelect: 'none'
           }}
+          onMouseDown={handleMouseDownPan}
+          onMouseMove={handleMouseMovePan}
+          onMouseUp={handleMouseUpPan}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
           {/* Pan indicator */}
           {!isPanning && !draggedScreen && (
             <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-              Two-finger scroll to pan • Ctrl/Cmd + scroll to zoom • Click screen to select • Drag screens to move
+              Trackpad to pan • Ctrl/Cmd + scroll to zoom • Drag screens to move • Click to select
             </div>
           )}
           
@@ -3295,7 +3742,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
           {/* Figma-style dot background */}
           <div />
           
-          {/* Canvas Container - Multi-Screen Layout */}
+          {/* Canvas Container - Clean Canvas like Logic Mode */}
           <div 
             className="absolute"
             style={{
@@ -3310,14 +3757,45 @@ export function DesignMode({ projectId }: DesignModeProps) {
               msUserSelect: 'none'
             }}
           >
-            {/* Multi-Screen Grid Layout */}
-            <div className="p-8 relative" style={{ width: '100%', height: '100%' }}>
+            {/* Clean Canvas Background like Logic Mode */}
+            <div className="absolute inset-0 bg-gray-50" />
+            
+            {/* Debug Info */}
+            <div className="absolute top-4 left-4 bg-white bg-opacity-90 text-xs text-gray-700 px-2 py-1 rounded">
+              Canvas: {canvasSize.width} × {canvasSize.height} • Screens: {screens.length} • Zoom: {Math.round(zoom * 100)}%
+            </div>
+            
+            {/* Background element for pan events */}
+            <div 
+              className="absolute inset-0"
+              onMouseDown={handleMouseDownPan}
+              onMouseMove={handleMouseMovePan}
+              onMouseUp={handleMouseUpPan}
+            />
+            
+            {/* Empty State */}
+            {screens.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-gray-200 rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <Smartphone className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No screens yet</h3>
+                  <p className="text-sm text-gray-500 mb-4">Add a screen to start designing your app</p>
+                  <button 
+                    onClick={() => setShowScreenSelector(true)}
+                    className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                  >
+                    Add Your First Screen
+                  </button>
+                </div>
+              </div>
+            )}
+            
+            {/* Freely Positioned Screens like Logic Mode */}
               {screens.map((screen, index) => {
                 const screenLayer = screen.layers.find(layer => layer.id === screen.activeLayer)
-                const screenPosition = screenPositions[screen.id] || { x: 0, y: 0 }
-                
-                // Calculate grid position using the helper function
-                const { defaultX, defaultY } = calculateScreenPosition(index, screen)
+              const screenPosition = screenPositions[screen.id] || { x: 100 + index * 50, y: 100 + index * 50 }
                 
                 return (
                   <div
@@ -3330,8 +3808,8 @@ export function DesignMode({ projectId }: DesignModeProps) {
                       width: screen.width || 400, 
                       height: screen.height || 600,
                       cursor: draggedScreen === screen.id ? 'grabbing' : (isPanning ? 'grabbing' : 'grab'),
-                      left: screenPosition.x + defaultX,
-                      top: screenPosition.y + defaultY,
+                    left: screenPosition.x,
+                    top: screenPosition.y,
                       transform: draggedScreen === screen.id ? 'scale(1.02)' : 'scale(1)',
                       transition: draggedScreen === screen.id ? 'none' : 'transform 0.2s ease-out',
                     }}
@@ -3452,59 +3930,22 @@ export function DesignMode({ projectId }: DesignModeProps) {
                               
                               {/* Edge handles */}
                               <div
-                                className="absolute top-1/2 -left-1 w-3 h-3 bg-blue-500 border border-white rounded cursor-w-resize transform -translate-y-1/2"
-                                onMouseDown={(e) => handleResizeStart(e, component, 'w')}
+                              className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-blue-500 border border-white rounded cursor-n-resize"
+                              onMouseDown={(e) => handleResizeStart(e, component, 'n')}
                               />
                               <div
-                                className="absolute top-1/2 -right-1 w-3 h-3 bg-blue-500 border border-white rounded cursor-e-resize transform -translate-y-1/2"
-                                onMouseDown={(e) => handleResizeStart(e, component, 'e')}
+                              className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-blue-500 border border-white rounded cursor-s-resize"
+                              onMouseDown={(e) => handleResizeStart(e, component, 's')}
                               />
                               <div
-                                className="absolute -top-1 left-1/2 w-3 h-3 bg-blue-500 border border-white rounded cursor-n-resize transform -translate-x-1/2"
-                                onMouseDown={(e) => handleResizeStart(e, component, 'n')}
+                              className="absolute -left-1 top-1/2 transform -translate-y-1/2 w-3 h-3 bg-blue-500 border border-white rounded cursor-w-resize"
+                              onMouseDown={(e) => handleResizeStart(e, component, 'w')}
                               />
                               <div
-                                className="absolute -bottom-1 left-1/2 w-3 h-3 bg-blue-500 border border-white rounded cursor-s-resize transform -translate-x-1/2"
-                                onMouseDown={(e) => handleResizeStart(e, component, 's')}
+                              className="absolute -right-1 top-1/2 transform -translate-y-1/2 w-3 h-3 bg-blue-500 border border-white rounded cursor-e-resize"
+                              onMouseDown={(e) => handleResizeStart(e, component, 'e')}
                               />
                             </>
-                          )}
-                          
-                          {/* Interaction Indicators */}
-                          {component.interactions && Object.keys(component.interactions).length > 0 && (
-                            <div className="absolute -top-6 left-0 flex space-x-1 pointer-events-none">
-                              {component.interactions.click && (
-                                <div className="bg-blue-500 text-white text-xs px-1 py-0.5 rounded">
-                                  C
-                                </div>
-                              )}
-                              {component.interactions.hover && (
-                                <div className="bg-green-500 text-white text-xs px-1 py-0.5 rounded">
-                                  H
-                                </div>
-                              )}
-                              {component.interactions.animation && (
-                                <div className="bg-purple-500 text-white text-xs px-1 py-0.5 rounded">
-                                  A
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Data Binding Indicators */}
-                          {component.dataBinding && Object.keys(component.dataBinding).length > 0 && (
-                            <div className="absolute -top-6 right-0 flex space-x-1 pointer-events-none">
-                              {component.dataBinding.variable && (
-                                <div className="bg-orange-500 text-white text-xs px-1 py-0.5 rounded">
-                                  V
-                                </div>
-                              )}
-                              {component.dataBinding.api && (
-                                <div className="bg-teal-500 text-white text-xs px-1 py-0.5 rounded">
-                                  API
-                                </div>
-                              )}
-                            </div>
                           )}
                         </div>
                       ))}
@@ -3512,7 +3953,6 @@ export function DesignMode({ projectId }: DesignModeProps) {
                   </div>
                 )
               })}
-            </div>
           </div>
         </div>
       </div>
@@ -3531,16 +3971,16 @@ export function DesignMode({ projectId }: DesignModeProps) {
                   <h3 className="text-sm font-medium text-gray-900">Properties</h3>
                   <p className="text-xs text-gray-500 mt-1">{selectedComponentData.name}</p>
                 </div>
-        <button
+                <button
                   onClick={() => deleteSelectedComponent()}
                   className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
                   title="Delete component (Delete key)"
-        >
+                >
                   <Trash2 className="h-4 w-4" />
-        </button>
+                </button>
               </div>
             </div>
-
+            
             <div className="flex-1 overflow-y-auto p-4">
               <div className="space-y-4">
                 {/* Styling */}
@@ -3583,6 +4023,130 @@ export function DesignMode({ projectId }: DesignModeProps) {
                   </div>
                 </div>
 
+                {/* Component Properties */}
+                <div>
+                  <h4 className="text-xs font-medium text-gray-700 mb-2">Properties</h4>
+                  <div className="space-y-2">
+                    {selectedComponentData.type === 'text' && (
+                      <>
+                        <div>
+                          <label className="text-xs text-gray-600">Heading</label>
+                          <input
+                            type="text"
+                            value={selectedComponentData.props?.heading || ''}
+                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
+                              props: { ...selectedComponentData.props, heading: e.target.value }
+                            })}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+                            placeholder="Enter heading text"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600">Content</label>
+                          <textarea
+                            value={selectedComponentData.props?.content || ''}
+                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
+                              props: { ...selectedComponentData.props, content: e.target.value }
+                            })}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+                            placeholder="Enter content text"
+                            rows={3}
+                          />
+                        </div>
+                      </>
+                    )}
+                    
+                    {selectedComponentData.type === 'button' && (
+                      <>
+                        <div>
+                          <label className="text-xs text-gray-600">Button Text</label>
+                          <input
+                            type="text"
+                            value={selectedComponentData.props?.text || ''}
+                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
+                              props: { ...selectedComponentData.props, text: e.target.value }
+                            })}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+                            placeholder="Enter button text"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600">Button Color</label>
+                          <input
+                            type="color"
+                            value={selectedComponentData.props?.color || '#3b82f6'}
+                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
+                              props: { ...selectedComponentData.props, color: e.target.value }
+                            })}
+                            className="w-full h-8 border border-gray-300 rounded"
+                          />
+                        </div>
+                      </>
+                    )}
+                    
+                    {selectedComponentData.type === 'input' && (
+                      <>
+                        <div>
+                          <label className="text-xs text-gray-600">Placeholder</label>
+                          <input
+                            type="text"
+                            value={selectedComponentData.props?.placeholder || ''}
+                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
+                              props: { ...selectedComponentData.props, placeholder: e.target.value }
+                            })}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+                            placeholder="Enter placeholder text"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600">Input Type</label>
+                          <select
+                            value={selectedComponentData.props?.type || 'text'}
+                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
+                              props: { ...selectedComponentData.props, type: e.target.value }
+                            })}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+                          >
+                            <option value="text">Text</option>
+                            <option value="email">Email</option>
+                            <option value="password">Password</option>
+                            <option value="number">Number</option>
+                          </select>
+                        </div>
+                      </>
+                    )}
+                    
+                    {selectedComponentData.type === 'image' && (
+                      <>
+                        <div>
+                          <label className="text-xs text-gray-600">Image URL</label>
+                          <input
+                            type="text"
+                            value={selectedComponentData.props?.src || ''}
+                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
+                              props: { ...selectedComponentData.props, src: e.target.value }
+                            })}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+                            placeholder="Enter image URL"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600">Alt Text</label>
+                          <input
+                            type="text"
+                            value={selectedComponentData.props?.alt || ''}
+                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
+                              props: { ...selectedComponentData.props, alt: e.target.value }
+                            })}
+                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
+                            placeholder="Enter alt text"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 {/* Interactions */}
                 <div>
                   <h4 className="text-xs font-medium text-gray-700 mb-2">Interactions</h4>
@@ -3593,24 +4157,24 @@ export function DesignMode({ projectId }: DesignModeProps) {
                         {selectedComponentData.interactions.click && (
                           <div className="flex items-center justify-between p-2 bg-blue-50 rounded text-xs">
                             <span className="text-blue-700">Click: {selectedComponentData.interactions.click}</span>
-        <button
+                            <button
                               onClick={() => removeInteraction(selectedComponentData.id, 'click')}
                               className="text-blue-500 hover:text-blue-700"
-        >
+                            >
                               ×
-        </button>
+                            </button>
                           </div>
                         )}
                         {selectedComponentData.interactions.hover && (
                           <div className="flex items-center justify-between p-2 bg-green-50 rounded text-xs">
                             <span className="text-green-700">Hover: {selectedComponentData.interactions.hover}</span>
-        <button
+                            <button
                               onClick={() => removeInteraction(selectedComponentData.id, 'hover')}
                               className="text-green-500 hover:text-green-700"
-        >
+                            >
                               ×
-        </button>
-      </div>
+                            </button>
+                          </div>
                         )}
                         {selectedComponentData.interactions.animation && (
                           <div className="flex items-center justify-between p-2 bg-purple-50 rounded text-xs">
@@ -3627,7 +4191,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
                     )}
                     
                     {/* Add Interaction Buttons */}
-              <button
+                    <button
                       onClick={() => addClickEvent(selectedComponentData.id)}
                       className="w-full text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-1 hover:bg-blue-100"
                     >
@@ -3664,14 +4228,14 @@ export function DesignMode({ projectId }: DesignModeProps) {
                             >
                               ×
                             </button>
-                        </div>
+                          </div>
                         )}
                         {selectedComponentData.dataBinding.api && (
-                          <div className="flex items-center justify-between p-2 bg-red-50 rounded text-xs">
-                            <span className="text-red-700">API: {selectedComponentData.dataBinding.api}</span>
+                          <div className="flex items-center justify-between p-2 bg-indigo-50 rounded text-xs">
+                            <span className="text-indigo-700">API: {selectedComponentData.dataBinding.api}</span>
                             <button 
                               onClick={() => removeDataBinding(selectedComponentData.id, 'api')}
-                              className="text-red-500 hover:text-red-700"
+                              className="text-indigo-500 hover:text-indigo-700"
                             >
                               ×
                             </button>
@@ -3681,7 +4245,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
                     )}
                     
                     {/* Add Data Binding Buttons */}
-                    <button 
+                    <button
                       onClick={() => bindToVariable(selectedComponentData.id)}
                       className="w-full text-xs bg-orange-50 text-orange-700 border border-orange-200 rounded px-2 py-1 hover:bg-orange-100"
                     >
@@ -3689,271 +4253,47 @@ export function DesignMode({ projectId }: DesignModeProps) {
                     </button>
                     <button 
                       onClick={() => connectToAPI(selectedComponentData.id)}
-                      className="w-full text-xs bg-red-50 text-red-700 border border-red-200 rounded px-2 py-1 hover:bg-red-100"
+                      className="w-full text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100"
                     >
                       + Connect to API
                     </button>
                   </div>
                 </div>
 
-                {/* Layering */}
-                        <div>
-                  <h4 className="text-xs font-medium text-gray-700 mb-2">Layering</h4>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => {
-                        if (selectedComponentData) {
-                          const maxZIndex = Math.max(...currentLayer?.components.map(c => c.zIndex || 1) || [1])
-                          updateComponentLocal(selectedComponentData.id, { zIndex: maxZIndex + 1 })
-                        }
-                      }}
-                      className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded hover:bg-blue-100"
-                      title="Bring to Front (Ctrl+Shift+])"
-                    >
-                      Bring to Front
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (selectedComponentData) {
-                          const minZIndex = Math.min(...currentLayer?.components.map(c => c.zIndex || 1) || [1])
-                          updateComponentLocal(selectedComponentData.id, { zIndex: minZIndex - 1 })
-                        }
-                      }}
-                      className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded hover:bg-blue-100"
-                      title="Send to Back (Ctrl+Shift+[)"
-                    >
-                      Send to Back
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (selectedComponentData && currentLayer) {
-                          const component = currentLayer.components.find(c => c.id === selectedComponentData.id)
-                          if (component) {
-                            const currentZIndex = component.zIndex || 1
-                            const nextComponent = currentLayer.components
-                              .filter(c => c.id !== selectedComponentData.id)
-                              .sort((a, b) => (a.zIndex || 1) - (b.zIndex || 1))
-                              .find(c => (c.zIndex || 1) > currentZIndex)
-                            
-                            if (nextComponent) {
-                              updateComponentLocal(selectedComponentData.id, { zIndex: (nextComponent.zIndex || 1) + 1 })
-                            }
-                          }
-                        }
-                      }}
-                      className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded hover:bg-blue-100"
-                      title="Bring Forward (Ctrl+])"
-                    >
-                      Bring Forward
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (selectedComponentData && currentLayer) {
-                          const component = currentLayer.components.find(c => c.id === selectedComponentData.id)
-                          if (component) {
-                            const currentZIndex = component.zIndex || 1
-                            const prevComponent = currentLayer.components
-                              .filter(c => c.id !== selectedComponentData.id)
-                              .sort((a, b) => (b.zIndex || 1) - (a.zIndex || 1))
-                              .find(c => (c.zIndex || 1) < currentZIndex)
-                            
-                            if (prevComponent) {
-                              updateComponentLocal(selectedComponentData.id, { zIndex: (prevComponent.zIndex || 1) - 1 })
-                            }
-                          }
-                        }
-                      }}
-                      className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded hover:bg-blue-100"
-                      title="Send Backward (Ctrl+[)"
-                    >
-                      Send Backward
-                    </button>
-                  </div>
-                </div>
-
-                {/* Component Properties */}
+                {/* Layer Management */}
                 <div>
-                  <h4 className="text-xs font-medium text-gray-700 mb-2">Properties</h4>
+                  <h4 className="text-xs font-medium text-gray-700 mb-2">Layer</h4>
                   <div className="space-y-2">
-                    {selectedComponentData.type === 'text' && (
-                      <>
-                        <div>
-                          <label className="text-xs text-gray-600">Heading</label>
-                  <input
-                            type="text"
-                            value={selectedComponentData.props?.heading || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, heading: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter heading text"
-                          />
-                        </div>
-                      <div>
-                          <label className="text-xs text-gray-600">Content</label>
-                          <textarea
-                            value={selectedComponentData.props?.content || ''}
-                          onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, content: e.target.value }
-                          })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter content text"
-                            rows={3}
-                        />
-                      </div>
-                      </>
-                    )}
-                    
-                    {selectedComponentData.type === 'button' && (
-                        <div>
-                        <label className="text-xs text-gray-600">Button Text</label>
-                          <input
-                          type="text"
-                          value={selectedComponentData.props?.text || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                            props: { ...selectedComponentData.props, text: e.target.value }
-                            })}
-                          className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                          placeholder="Enter button text"
-                          />
-                        </div>
-                    )}
-                    
-                    {selectedComponentData.type === 'input' && (
-                      <>
-                        <div>
-                          <label className="text-xs text-gray-600">Label</label>
-                  <input
-                            type="text"
-                            value={selectedComponentData.props?.label || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, label: e.target.value }
-                    })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter label text"
-                  />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-600">Input Type</label>
-                          <select
-                            value={selectedComponentData.props?.type || 'text'}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, type: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                          >
-                            <option value="text">Text</option>
-                            <option value="email">Email</option>
-                            <option value="password">Password</option>
-                            <option value="number">Number</option>
-                            <option value="tel">Phone</option>
-                            <option value="url">URL</option>
-                          </select>
-              </div>
-                        <div>
-                          <label className="text-xs text-gray-600">Placeholder</label>
-                          <input
-                            type="text"
-                            value={selectedComponentData.props?.placeholder || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, placeholder: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter placeholder text"
-                          />
-                        </div>
-                      </>
-                    )}
-                    
-                    {selectedComponentData.type === 'image' && (
-                      <>
-                        <div>
-                          <label className="text-xs text-gray-600">Image URL</label>
-                          <input
-                            type="url"
-                            value={selectedComponentData.props?.url || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, url: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="https://example.com/image.jpg"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-600">Alt Text</label>
-                          <input
-                            type="text"
-                            value={selectedComponentData.props?.alt || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, alt: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter alt text for accessibility"
-                          />
-                        </div>
-                      </>
-                    )}
-                    
-                    {selectedComponentData.type === 'form' && (
-                      <>
-                        <div>
-                          <label className="text-xs text-gray-600">Form Title</label>
-                          <input
-                            type="text"
-                            value={selectedComponentData.props?.title || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, title: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter form title"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-600">Button Text</label>
-                          <input
-                            type="text"
-                            value={selectedComponentData.props?.buttonText || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, buttonText: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter button text"
-                          />
-                        </div>
-                      </>
-                    )}
-                    
-                    {selectedComponentData.type === 'list' && (
-                      <>
-                        <div>
-                          <label className="text-xs text-gray-600">List Title</label>
-                          <input
-                            type="text"
-                            value={selectedComponentData.props?.title || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, title: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter list title"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-600">List Items (comma separated)</label>
-                          <textarea
-                            value={selectedComponentData.props?.items?.join(', ') || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { 
-                                ...selectedComponentData.props, 
-                                items: e.target.value.split(',').map(item => item.trim()).filter(item => item)
-                              }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Item 1, Item 2, Item 3"
-                            rows={3}
-                          />
-                        </div>
-                      </>
-                    )}
+                    <div className="flex space-x-1">
+                      <button
+                        onClick={() => bringToFront(selectedComponentData.id)}
+                        className="flex-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100"
+                        title="Bring to Front"
+                      >
+                        Front
+                      </button>
+                      <button
+                        onClick={() => bringForward(selectedComponentData.id)}
+                        className="flex-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100"
+                        title="Bring Forward"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        onClick={() => sendBackward(selectedComponentData.id)}
+                        className="flex-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100"
+                        title="Send Backward"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        onClick={() => sendToBack(selectedComponentData.id)}
+                        className="flex-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100"
+                        title="Send to Back"
+                      >
+                        Back
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -3986,8 +4326,6 @@ export function DesignMode({ projectId }: DesignModeProps) {
           <span className="text-sm font-medium">Code</span>
           </button>
         </div>
-
-      {/* Mode Navigation Buttons - Removed */}
     </div>
   )
 } 
