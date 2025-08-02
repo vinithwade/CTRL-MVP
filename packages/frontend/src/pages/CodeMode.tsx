@@ -56,25 +56,26 @@ export function CodeMode() {
   const [generationMessage, setGenerationMessage] = useState('')
 
   // Generate code from Design and Logic modes
+  const appComponent = generateAppComponent(components)
+  const allComponentsCode = generateAllComponentsCode(components)
+
   const generateCodeFromDesign = useCallback(() => {
     // Check if files already exist
     if (generatedFiles.length > 0) {
-      setGenerationMessage('Code already generated! Use "Regenerate" to create new code.')
-      setTimeout(() => setGenerationMessage(''), 3000)
       return
     }
 
     setIsGenerating(true)
-    setGenerationMessage('')
-    
-    // Simulate generation time
-    setTimeout(() => {
+    setGenerationMessage('Generating code from design...')
+
+    try {
+      // Create new files
       const newFiles: FileNode[] = []
       
       // Generate React components from Design Mode
       if (components.length > 0 || logicNodes.length > 0) {
         // Generate main App component with all components and logic in one file
-        const appComponent = generateAppComponent(components, screens, logicNodes, connections)
+        const appComponent = generateAppComponent(components)
         newFiles.push({
           id: 'app-component',
           name: 'App.tsx',
@@ -85,7 +86,7 @@ export function CodeMode() {
         })
 
         // Generate a single components file with all components and their logic
-        const allComponentsCode = generateAllComponentsCode(components, logicNodes, connections)
+        const allComponentsCode = generateAllComponentsCode(components)
         newFiles.push({
           id: 'all-components',
           name: 'components.tsx',
@@ -173,8 +174,14 @@ export function CodeMode() {
       setIsGenerating(false)
       setGenerationMessage('Code generated successfully!')
       setTimeout(() => setGenerationMessage(''), 3000)
-    }, 2000)
-  }, [components, screens, logicNodes, connections, generatedFiles.length])
+    } catch (error) {
+      console.error('Error generating code:', error)
+      setGenerationMessage('Error generating code. Please try again.')
+      setTimeout(() => setGenerationMessage(''), 3000)
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [components, logicNodes, generatedFiles.length])
 
   const regenerateCode = useCallback(() => {
     // Clear existing generated files
@@ -195,7 +202,7 @@ export function CodeMode() {
     generateCodeFromDesign()
   }, [generateCodeFromDesign])
 
-  const generateAppComponent = (components: any[], screens: any[], logicNodes: any[], connections: any[]): string => {
+  const generateAppComponent = (components: any[]): string => {
     // Generate logic functions based on connections
     const logicFunctions = generateLogicFunctions(logicNodes, connections)
     
@@ -245,7 +252,7 @@ export default function App() {
 }`
   }
 
-  const generateAllComponentsCode = (components: any[], logicNodes: any[], connections: any[]): string => {
+  const generateAllComponentsCode = (components: any[]): string => {
     const componentExports = components.map(comp => comp.name).join(', ')
     
     // Get screen type for responsive design

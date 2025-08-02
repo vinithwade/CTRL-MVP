@@ -44,8 +44,7 @@ export function LogicMode() {
     updateLogicNode, 
     deleteLogicNode, 
     addConnection, 
-    deleteConnection, 
-    clearLogicData 
+    deleteConnection 
   } = useDesign()
   
   // Get components that are actually used in the design mode (from active screen)
