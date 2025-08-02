@@ -2253,7 +2253,7 @@ export default App;`
   const generateStateVariables = (logicNodes: any[]): string => {
     const stateVars = logicNodes
       .filter(node => node.type === 'data' || node.type === 'api')
-      .map(node => `${node.name.toLowerCase().replace(/\s+/g, ''): null}`)
+      .map(node => `${node.name.toLowerCase().replace(/\s+/g, '')}: null`)
       .join(',\n    ')
     
     return stateVars || '// No state variables needed'
