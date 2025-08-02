@@ -535,7 +535,7 @@ export function LogicMode() {
 
   return (
     <div className="h-screen flex bg-gray-50 font-['Inter'] font-semibold">
-      {/* Left Panel */}
+      {/* Left Panel - Hidden by default */}
       {leftSidebarVisible && (
         <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
           <div className="flex items-center justify-between p-3 border-b border-gray-200">
@@ -663,24 +663,67 @@ export function LogicMode() {
         </div>
       )}
 
-      {/* Main Canvas Area */}
-      <div className="flex-1 relative overflow-hidden" ref={containerRef}>
-        {/* Floating Top Bar */}
-        <div className="absolute top-4 left-4 z-20 bg-white border border-gray-200 rounded-lg shadow-lg px-4 py-2 flex items-center space-x-4">
+      {/* Main Canvas - Full Screen */}
+      <div className={`flex-1 relative overflow-hidden ${leftSidebarVisible ? '' : 'w-full'}`} ref={containerRef}>
+        {/* Top Toolbar */}
+        <div className="absolute top-4 left-4 z-50 flex items-center space-x-2">
+          {/* Toggle Left Sidebar Button */}
           <button
             onClick={() => setLeftSidebarVisible(!leftSidebarVisible)}
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
-            title="Toggle sidebar"
+            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
+            title={leftSidebarVisible ? "Hide Tools" : "Show Tools"}
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h1 className="text-lg font-semibold text-gray-900">Logic Flow Builder</h1>
-          {isConnecting && (
-            <span className="text-blue-600 font-medium text-sm">Connecting nodes... Click another node or press Esc to cancel</span>
-          )}
+          
+          {/* Toggle Right Sidebar Button */}
+          <button
+            onClick={() => setSidebarVisible(!sidebarVisible)}
+            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
+            title={sidebarVisible ? "Hide Properties" : "Show Properties"}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </button>
+          
+          {/* Zoom Controls */}
+          <button
+            onClick={zoomIn}
+            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
+            title="Zoom In"
+          >
+            +
+          </button>
+          <button
+            onClick={zoomOut}
+            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
+            title="Zoom Out"
+          >
+            −
+          </button>
+          <button
+            onClick={resetView}
+            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50 text-xs"
+            title="Reset View"
+          >
+            ⌂
+          </button>
         </div>
+
+        {/* Zoom Level Indicator */}
+        <div className="absolute top-4 right-4 bg-white border border-gray-300 rounded shadow-lg px-3 py-1 text-sm text-gray-600 z-50">
+          {Math.round(zoom * 100)}%
+        </div>
+
+        {/* Connection Status */}
+        {isConnecting && (
+          <div className="absolute top-16 left-4 bg-blue-100 border border-blue-300 rounded-lg px-4 py-2 text-blue-800 text-sm z-50">
+            Connecting nodes... Click another node or press Esc to cancel
+          </div>
+        )}
 
         <div
           ref={canvasRef}
@@ -887,41 +930,11 @@ export function LogicMode() {
             </div>
           )
         })()}
-
-        {/* Zoom Controls */}
-        <div className="absolute bottom-4 left-4 flex flex-col space-y-2">
-          <button
-            onClick={zoomIn}
-            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
-            title="Zoom In"
-          >
-            +
-          </button>
-          <button
-            onClick={zoomOut}
-            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
-            title="Zoom Out"
-          >
-            −
-          </button>
-          <button
-            onClick={resetView}
-            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50 text-xs"
-            title="Reset View"
-          >
-            ⌂
-          </button>
-        </div>
-
-        {/* Zoom Level Indicator */}
-        <div className="absolute top-20 right-4 bg-white border border-gray-300 rounded shadow-lg px-3 py-1 text-sm text-gray-600">
-          {Math.round(zoom * 100)}%
-        </div>
       </div>
 
-      {/* Right Sidebar */}
+      {/* Right Sidebar - Overlay */}
       {sidebarVisible && (
-        <div className="w-80 bg-white border-l border-gray-200 flex flex-col flex-shrink-0">
+        <div className="absolute top-0 right-0 h-full w-80 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 z-40 shadow-lg">
           <div className="flex-1 overflow-y-auto">
             {selectedNode ? (
               <div className="p-4">
