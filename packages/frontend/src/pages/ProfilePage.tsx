@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient'
 import { useNavigate } from 'react-router-dom'
 
 export function ProfilePage() {
-  const { user, logout, loading } = useAuth()
+  const { user, logout, error: authError } = useAuth()
   const [email, setEmail] = useState(user?.email || '')
   const [newEmail, setNewEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')

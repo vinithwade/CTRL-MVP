@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { ArrowRight, Layout, GitBranch, Code, Zap, Sparkles, Star, Play } from 'lucide-react'
+import { ArrowRight, Layout, GitBranch, Code, Sparkles, Star, Play } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 import { useState, useEffect, useRef } from 'react'
 import { AuthModal } from '../components/AuthModal'

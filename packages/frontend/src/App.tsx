@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, useParams } from 'react-router-dom'
+import { Routes, Route, useParams } from 'react-router-dom'
 import { Layout } from '@/components/Layout'
 import { HomePage } from '@/pages/HomePage'
 import { AIPage } from '@/pages/AIPage'

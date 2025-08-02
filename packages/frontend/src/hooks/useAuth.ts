@@ -137,7 +137,7 @@ export function useAuth() {
   // Test function to verify Supabase connection
   const testConnection = async () => {
     try {
-      const { data, error } = await supabase.from('projects').select('count').limit(1)
+      const { error } = await supabase.from('projects').select('count').limit(1)
       if (error) {
         console.error('Supabase connection test failed:', error)
         return false

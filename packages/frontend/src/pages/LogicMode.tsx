@@ -36,7 +36,6 @@ interface Connection {
 export function LogicMode() {
   const { navigateToMode } = useNavigation()
   const { 
-    components, 
     screens, 
     activeScreen,
     logicNodes, 
@@ -45,7 +44,8 @@ export function LogicMode() {
     updateLogicNode, 
     deleteLogicNode, 
     addConnection, 
-    deleteConnection 
+    deleteConnection, 
+    clearLogicData 
   } = useDesign()
   
   // Get components that are actually used in the design mode (from active screen)

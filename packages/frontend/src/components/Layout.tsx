@@ -2,18 +2,14 @@ import { ReactNode, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AuthModal } from './AuthModal'
 import { 
-  Layout as LayoutIcon, 
-  Settings, 
-  User, 
-  LogOut,
   Sparkles,
   Github,
   Twitter,
   Menu,
-  X
+  X,
+  User
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
-import { useDesign } from '../contexts/DesignContext'
 
 interface LayoutProps {
   children: ReactNode
@@ -34,10 +30,6 @@ export function Layout({ children }: LayoutProps) {
   const openAuthModal = (mode: 'login' | 'signup') => {
     setAuthModalMode(mode)
     setAuthModalOpen(true)
-  }
-
-  const closeAuthModal = () => {
-    setAuthModalOpen(false)
   }
 
   const handleLogout = async () => {
