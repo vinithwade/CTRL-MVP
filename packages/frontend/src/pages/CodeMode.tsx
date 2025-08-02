@@ -21,6 +21,8 @@ import {
   Play,
   Layout
 } from 'lucide-react'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 interface FileNode {
   id: string
@@ -2010,7 +2012,7 @@ export default App;`
           name: file.name,
           path: file.path,
           content: file.content,
-          language: file.language || 'text',
+          language: file.language || getLanguageFromFile(file.name),
           isDirty: false
         }
         setTabs(prev => [...prev, newTab])
@@ -2095,6 +2097,62 @@ export default App;`
         return <Globe className="w-4 h-4" />
       default:
         return <FileText className="w-4 h-4" />
+    }
+  }
+
+  const getLanguageFromFile = (filename: string): string => {
+    const extension = filename.split('.').pop()?.toLowerCase()
+    switch (extension) {
+      case 'ts':
+      case 'tsx':
+        return 'typescript'
+      case 'js':
+      case 'jsx':
+        return 'javascript'
+      case 'json':
+        return 'json'
+      case 'css':
+        return 'css'
+      case 'html':
+        return 'html'
+      case 'md':
+        return 'markdown'
+      case 'py':
+        return 'python'
+      case 'java':
+        return 'java'
+      case 'cpp':
+      case 'cc':
+      case 'cxx':
+        return 'cpp'
+      case 'c':
+        return 'c'
+      case 'php':
+        return 'php'
+      case 'rb':
+        return 'ruby'
+      case 'go':
+        return 'go'
+      case 'rs':
+        return 'rust'
+      case 'swift':
+        return 'swift'
+      case 'kt':
+        return 'kotlin'
+      case 'scala':
+        return 'scala'
+      case 'sql':
+        return 'sql'
+      case 'sh':
+      case 'bash':
+        return 'bash'
+      case 'yaml':
+      case 'yml':
+        return 'yaml'
+      case 'xml':
+        return 'xml'
+      default:
+        return 'typescript'
     }
   }
 
@@ -2257,6 +2315,153 @@ export default App;`
       .join(',\n    ')
     
     return stateVars || '// No state variables needed'
+  }
+
+  // Code Editor Component with Syntax Highlighting
+  const CodeEditor = ({ content, language, onChange }: { content: string; language: string; onChange: (value: string) => void }) => {
+    const [isEditing, setIsEditing] = useState(false)
+    const [editContent, setEditContent] = useState(content)
+
+    const handleDoubleClick = () => {
+      setIsEditing(true)
+      setEditContent(content)
+    }
+
+    const handleSave = () => {
+      onChange(editContent)
+      setIsEditing(false)
+    }
+
+    const handleCancel = () => {
+      setEditContent(content)
+      setIsEditing(false)
+    }
+
+    const getLanguage = (lang: string) => {
+      switch (lang) {
+        case 'typescript':
+        case 'ts':
+        case 'tsx':
+          return 'typescript'
+        case 'javascript':
+        case 'js':
+        case 'jsx':
+          return 'javascript'
+        case 'json':
+          return 'json'
+        case 'css':
+          return 'css'
+        case 'html':
+          return 'html'
+        case 'markdown':
+        case 'md':
+          return 'markdown'
+        case 'python':
+        case 'py':
+          return 'python'
+        case 'java':
+          return 'java'
+        case 'cpp':
+        case 'cc':
+        case 'cxx':
+          return 'cpp'
+        case 'c':
+          return 'c'
+        case 'php':
+          return 'php'
+        case 'ruby':
+        case 'rb':
+          return 'ruby'
+        case 'go':
+          return 'go'
+        case 'rust':
+        case 'rs':
+          return 'rust'
+        case 'swift':
+          return 'swift'
+        case 'kotlin':
+        case 'kt':
+          return 'kotlin'
+        case 'scala':
+          return 'scala'
+        case 'sql':
+          return 'sql'
+        case 'bash':
+        case 'sh':
+          return 'bash'
+        case 'yaml':
+        case 'yml':
+          return 'yaml'
+        case 'xml':
+          return 'xml'
+        default:
+          return 'typescript'
+      }
+    }
+
+    if (isEditing) {
+      return (
+        <div className="h-full flex flex-col">
+          <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between">
+            <span className="text-sm">Editing {language} file</span>
+            <div className="flex space-x-2">
+              <button
+                onClick={handleSave}
+                className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+              >
+                Save
+              </button>
+              <button
+                onClick={handleCancel}
+                className="px-3 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+          <textarea
+            value={editContent}
+            onChange={(e) => setEditContent(e.target.value)}
+            className="flex-1 bg-gray-900 text-white p-4 font-mono text-sm resize-none border-none outline-none"
+            spellCheck={false}
+            autoFocus
+          />
+        </div>
+      )
+    }
+
+    return (
+      <div className="h-full cursor-pointer" onDoubleClick={handleDoubleClick}>
+        <div className="bg-gray-800 text-white px-4 py-2 flex items-center justify-between">
+          <span className="text-sm">{language.toUpperCase()}</span>
+          <span className="text-xs text-gray-400">Double-click to edit</span>
+        </div>
+        <div className="h-full overflow-auto">
+          <SyntaxHighlighter
+            language={getLanguage(language)}
+            style={vscDarkPlus}
+            customStyle={{
+              margin: 0,
+              padding: '1rem',
+              fontSize: '14px',
+              lineHeight: '1.5',
+              backgroundColor: '#1e1e1e',
+              height: '100%',
+              overflow: 'auto'
+            }}
+            showLineNumbers={true}
+            wrapLines={true}
+            lineNumberStyle={{
+              color: '#858585',
+              fontSize: '12px',
+              paddingRight: '1rem'
+            }}
+          >
+            {content}
+          </SyntaxHighlighter>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -2558,22 +2763,12 @@ export default App;`
             <div className="flex-1 bg-white">
               {activeTabData ? (
                 <div className="h-full flex flex-col">
-                  {/* Line Numbers */}
-                  <div className="flex">
-                    <div className="w-12 bg-gray-50 text-gray-500 text-xs p-2 select-none border-r border-gray-200">
-                      {activeTabData.content.split('\n').map((_, i) => (
-                        <div key={i} className="text-right">{i + 1}</div>
-                      ))}
-                    </div>
-                    {/* Code Editor */}
-                    <textarea
-                      value={activeTabData.content}
-                      onChange={(e) => updateTabContent(activeTabData.id, e.target.value)}
-                      className="flex-1 bg-white text-gray-900 p-2 font-mono text-sm resize-none border-none outline-none"
-                      style={{ height: '100%' }}
-                      spellCheck={false}
-                    />
-                  </div>
+                  {/* Code Editor */}
+                  <CodeEditor
+                    content={activeTabData.content}
+                    language={activeTabData.language}
+                    onChange={(newContent) => updateTabContent(activeTabData.id, newContent)}
+                  />
                 </div>
               ) : (
                 <div className="h-full flex items-center justify-center text-gray-400">
