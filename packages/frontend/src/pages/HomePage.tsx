@@ -79,9 +79,49 @@ export function HomePage() {
             <div className="flex items-center justify-center space-x-8 text-white/60 font-['Inter']">
               <div className="flex items-center space-x-2">
                 <div className="flex -space-x-2">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-400 to-purple-500 border-2 border-white/20"></div>
-                  ))}
+                  {/* Developer Profile Pictures */}
+                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden">
+                    <img 
+                      src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=32&h=32&fit=crop&crop=face" 
+                      alt="Developer" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden">
+                    <img 
+                      src="https://images.unsplash.com/photo-1494790108755-2616b612b786?w=32&h=32&fit=crop&crop=face" 
+                      alt="Developer" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden">
+                    <img 
+                      src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=32&h=32&fit=crop&crop=face" 
+                      alt="Developer" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden">
+                    <img 
+                      src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=32&h=32&fit=crop&crop=face" 
+                      alt="Developer" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden">
+                    <img 
+                      src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=32&h=32&fit=crop&crop=face" 
+                      alt="Developer" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden">
+                    <img 
+                      src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=32&h=32&fit=crop&crop=face" 
+                      alt="Developer" 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 </div>
                 <span className="text-sm">10,000+ developers</span>
               </div>
@@ -180,7 +220,52 @@ export function HomePage() {
             </div>
             <div className="group">
               <div className="text-4xl md:text-5xl font-semibold text-white mb-2 group-hover:scale-110 transition-transform duration-300 font-['Inter']">10K+</div>
-              <div className="text-white/70 font-['Inter']">Developers</div>
+              <div className="text-white/70 font-['Inter'] mb-4">Developers</div>
+              {/* Developer Profile Pictures */}
+              <div className="flex justify-center -space-x-2 mb-2">
+                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                  <img 
+                    src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=24&h=24&fit=crop&crop=face" 
+                    alt="Developer" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                  <img 
+                    src="https://images.unsplash.com/photo-1494790108755-2616b612b786?w=24&h=24&fit=crop&crop=face" 
+                    alt="Developer" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                  <img 
+                    src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=24&h=24&fit=crop&crop=face" 
+                    alt="Developer" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                  <img 
+                    src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=24&h=24&fit=crop&crop=face" 
+                    alt="Developer" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                  <img 
+                    src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=24&h=24&fit=crop&crop=face" 
+                    alt="Developer" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                  <img 
+                    src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=24&h=24&fit=crop&crop=face" 
+                    alt="Developer" 
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              </div>
             </div>
             <div className="group">
               <div className="text-4xl md:text-5xl font-semibold text-white mb-2 group-hover:scale-110 transition-transform duration-300 font-['Inter']">99.9%</div>
