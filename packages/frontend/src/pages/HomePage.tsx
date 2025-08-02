@@ -302,6 +302,14 @@ export function HomePage() {
                   1
                 </div>
               </div>
+              {/* Design Interface Image */}
+              <div className="mb-6 rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+                <img 
+                  src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=600&fit=crop&crop=center" 
+                  alt="CTRL Design Interface" 
+                  className="w-full h-auto object-cover"
+                />
+              </div>
               <h3 className="text-2xl font-semibold text-white mb-4 font-['Inter']">Design Visually</h3>
               <p className="text-white/70 leading-relaxed font-['Inter']">
                 Use our intuitive drag-and-drop interface to create beautiful UIs with pre-built components and real-time preview.
