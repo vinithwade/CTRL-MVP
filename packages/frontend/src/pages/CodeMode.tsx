@@ -2337,6 +2337,11 @@ export default App;`
       setIsEditing(false)
     }
 
+    // Prevent scroll propagation
+    const handleScroll = (e: React.WheelEvent) => {
+      e.stopPropagation()
+    }
+
     const getLanguage = (lang: string) => {
       switch (lang) {
         case 'typescript':
@@ -2422,6 +2427,7 @@ export default App;`
           <textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
+            onWheel={handleScroll}
             className="flex-1 bg-gray-900 text-white p-4 font-mono text-sm resize-none border-none outline-none"
             spellCheck={false}
             autoFocus
@@ -2436,7 +2442,7 @@ export default App;`
           <span className="text-sm">{language.toUpperCase()}</span>
           <span className="text-xs text-gray-400">Double-click to edit</span>
         </div>
-        <div className="h-full overflow-auto">
+        <div className="h-full overflow-auto" onWheel={handleScroll}>
           <SyntaxHighlighter
             language={getLanguage(language)}
             style={vscDarkPlus}
@@ -2534,8 +2540,9 @@ export default App;`
       <div className="flex-1 flex">
         {/* Sidebar */}
         <div 
-          className="bg-gray-50 border-r border-gray-200 flex flex-col"
+          className="bg-gray-50 border-r border-gray-200 flex flex-col overflow-hidden"
           style={{ width: sidebarWidth }}
+          onWheel={(e) => e.stopPropagation()}
         >
           {/* Sidebar Tabs */}
           <div className="flex border-b border-gray-200">
@@ -2560,7 +2567,7 @@ export default App;`
           </div>
 
           {/* Sidebar Content */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto" onWheel={(e) => e.stopPropagation()}>
             {activePanel === 'explorer' && (
               <div className="p-2">
                 <div className="flex items-center justify-between mb-2">
@@ -2731,7 +2738,7 @@ export default App;`
         />
 
         {/* Main Editor Area */}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col overflow-hidden" onWheel={(e) => e.stopPropagation()}>
           {/* Editor Tabs */}
           <div className="bg-white border-b border-gray-200 flex items-center">
             {tabs.map(tab => (
@@ -2759,10 +2766,10 @@ export default App;`
           </div>
 
           {/* Editor Content */}
-          <div className="flex-1 flex">
-            <div className="flex-1 bg-white">
+          <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 bg-white overflow-hidden">
               {activeTabData ? (
-                <div className="h-full flex flex-col">
+                <div className="h-full flex flex-col overflow-hidden">
                   {/* Code Editor */}
                   <CodeEditor
                     content={activeTabData.content}
