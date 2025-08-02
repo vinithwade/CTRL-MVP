@@ -13,8 +13,8 @@ import {
   Palette, 
   Square, 
   ChevronDown,
-  ChevronLeft, 
-  ChevronRight, 
+  
+  
   Layout,
   Database,
   Smartphone,
