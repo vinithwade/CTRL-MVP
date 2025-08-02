@@ -298,8 +298,8 @@ export function HomePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             <div className="text-center group">
               <div className="relative w-24 h-24 mx-auto mb-8">
-                <div className="relative w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-semibold group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                  1
+                <div className="relative w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-semibold group-hover:scale-110 transition-transform duration-300 shadow-lg overflow-hidden">
+                  <img src="/images/Design.png" alt="Design Icon" className="w-full h-full object-cover rounded-full" />
                 </div>
               </div>
               {/* Design Interface Image */}
@@ -318,8 +318,8 @@ export function HomePage() {
             
             <div className="text-center group">
               <div className="relative w-24 h-24 mx-auto mb-8">
-                <div className="relative w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-semibold group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                  2
+                <div className="relative w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-semibold group-hover:scale-110 transition-transform duration-300 shadow-lg overflow-hidden">
+                  <img src="/images/logic.png" alt="Logic Icon" className="w-full h-full object-cover rounded-full" />
                 </div>
               </div>
               <h3 className="text-2xl font-semibold text-white mb-4 font-['Inter']">Connect Logic</h3>
@@ -330,8 +330,8 @@ export function HomePage() {
             
             <div className="text-center group">
               <div className="relative w-24 h-24 mx-auto mb-8">
-                <div className="relative w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-semibold group-hover:scale-110 transition-transform duration-300 shadow-lg">
-                  3
+                <div className="relative w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-semibold group-hover:scale-110 transition-transform duration-300 shadow-lg overflow-hidden">
+                  <img src="/images/code.png" alt="Code Icon" className="w-full h-full object-cover rounded-full" />
                 </div>
               </div>
               <h3 className="text-2xl font-semibold text-white mb-4 font-['Inter']">Generate Code</h3>
