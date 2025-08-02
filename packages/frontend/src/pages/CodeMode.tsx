@@ -44,7 +44,7 @@ interface EditorTab {
 
 export function CodeMode() {
   const { navigateToMode } = useNavigation()
-  const { components, screens } = useDesign()
+  const { components, screens, logicNodes, connections } = useDesign()
   const [activeTab, setActiveTab] = useState<string | null>(null)
   const [tabs, setTabs] = useState<EditorTab[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
@@ -69,9 +69,9 @@ export function CodeMode() {
       const newFiles: FileNode[] = []
       
       // Generate React components from Design Mode
-      if (components.length > 0) {
-        // Generate main App component with all components in one file
-        const appComponent = generateAppComponent(components, screens)
+      if (components.length > 0 || logicNodes.length > 0) {
+        // Generate main App component with all components and logic in one file
+        const appComponent = generateAppComponent(components, screens, logicNodes, connections)
         newFiles.push({
           id: 'app-component',
           name: 'App.tsx',
@@ -81,8 +81,8 @@ export function CodeMode() {
           content: appComponent
         })
 
-        // Generate a single components file with all components
-        const allComponentsCode = generateAllComponentsCode(components)
+        // Generate a single components file with all components and their logic
+        const allComponentsCode = generateAllComponentsCode(components, logicNodes, connections)
         newFiles.push({
           id: 'all-components',
           name: 'components.tsx',
@@ -171,7 +171,7 @@ export function CodeMode() {
       setGenerationMessage('Code generated successfully!')
       setTimeout(() => setGenerationMessage(''), 3000)
     }, 2000)
-  }, [components, screens, generatedFiles.length])
+  }, [components, screens, logicNodes, connections, generatedFiles.length])
 
   const regenerateCode = useCallback(() => {
     // Clear existing generated files
@@ -192,30 +192,57 @@ export function CodeMode() {
     generateCodeFromDesign()
   }, [generateCodeFromDesign])
 
-  const generateAppComponent = (components: any[], screens: any[]): string => {
+  const generateAppComponent = (components: any[], screens: any[], logicNodes: any[], connections: any[]): string => {
+    // Generate logic functions based on connections
+    const logicFunctions = generateLogicFunctions(logicNodes, connections)
+    
+    // Generate component JSX with event handlers
     const componentJSX = components.map(comp => {
-      const props = comp.logic ? generateLogicProps(comp.logic) : ''
-      return `      <${comp.name}${props} />`
+      const componentLogic = logicNodes.find(node => node.type === 'component' && node.componentId === comp.id)
+      const eventHandlers = componentLogic ? generateEventHandlers(componentLogic, connections, logicNodes) : ''
+      
+      return `
+        <div 
+          key="${comp.id}"
+          className="${comp.props?.className || ''}"
+          style={{
+            position: 'absolute',
+            left: ${comp.position.x}px,
+            top: ${comp.position.y}px,
+            width: ${comp.size.width}px,
+            height: ${comp.size.height}px,
+            backgroundColor: '${comp.backgroundColor || 'transparent'}',
+            zIndex: ${comp.zIndex || 1}
+          }}
+          ${eventHandlers}
+        >
+          ${generateComponentContent(comp)}
+        </div>
+      `
     }).join('\n')
 
-    const screenInfo = screens.length > 0 ? `\n  // Generated from ${screens.length} screen(s)` : ''
+    return `import React, { useState, useEffect } from 'react'
+import './styles.css'
 
-    return `import React from 'react';
-import { ${components.map(comp => comp.name).join(', ')} } from './components';
-import './styles.css';${screenInfo}
+${logicFunctions}
 
-function App() {
+export default function App() {
+  const [state, setState] = useState({
+    // Add state variables based on logic nodes
+    ${generateStateVariables(logicNodes)}
+  })
+
   return (
-    <div className="App">
-${componentJSX}
+    <div className="app">
+      <div className="screen-container">
+        ${componentJSX}
+      </div>
     </div>
-  );
-}
-
-export default App;`
+  )
+}`
   }
 
-  const generateAllComponentsCode = (components: any[]): string => {
+  const generateAllComponentsCode = (components: any[], logicNodes: any[], connections: any[]): string => {
     const componentExports = components.map(comp => comp.name).join(', ')
     
     // Get screen type for responsive design
@@ -2143,6 +2170,131 @@ export default App;`
 
   const activeTabData = tabs.find(tab => tab.id === activeTab)
 
+  // Helper functions for logic generation
+  const generateLogicFunctions = (logicNodes: any[], connections: any[]): string => {
+    let functions = ''
+    
+    // Generate functions for each logic node
+    logicNodes.forEach(node => {
+      if (node.type === 'trigger') {
+        functions += `
+  const handle${node.name.replace(/\s+/g, '')} = () => {
+    // Trigger logic for ${node.name}
+    ${generateTriggerLogic(node, connections, logicNodes)}
+  }`
+      } else if (node.type === 'action') {
+        functions += `
+  const ${node.name.toLowerCase().replace(/\s+/g, '')} = () => {
+    // Action: ${node.name}
+    ${generateActionLogic(node, connections, logicNodes)}
+  }`
+      } else if (node.type === 'api') {
+        functions += `
+  const ${node.name.toLowerCase().replace(/\s+/g, '')} = async () => {
+    // API call: ${node.name}
+    try {
+      const response = await fetch('${node.data?.url || ''}', {
+        method: '${node.data?.method || 'GET'}',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      const data = await response.json()
+      setState(prev => ({ ...prev, ${node.name.toLowerCase().replace(/\s+/g, '')}: data }))
+    } catch (error) {
+      console.error('API Error:', error)
+    }
+  }`
+      }
+    })
+    
+    return functions
+  }
+
+  const generateEventHandlers = (componentNode: any, connections: any[], logicNodes: any[]): string => {
+    const outgoingConnections = connections.filter(conn => conn.from === componentNode.id)
+    let handlers = ''
+    
+    outgoingConnections.forEach(conn => {
+      const targetNode = logicNodes.find(node => node.id === conn.to)
+      if (targetNode && targetNode.type === 'trigger') {
+        handlers += `\n          onClick={handle${targetNode.name.replace(/\s+/g, '')}}`
+      }
+    })
+    
+    return handlers
+  }
+
+  const generateComponentContent = (component: any): string => {
+    switch (component.type) {
+      case 'button':
+        return `<button className="w-full h-full flex items-center justify-center bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+          ${component.name}
+        </button>`
+      case 'input':
+        return `<input 
+          type="text" 
+          placeholder="${component.name}"
+          className="w-full h-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />`
+      case 'image':
+        return `<img 
+          src="${component.props?.src || 'https://via.placeholder.com/150'}" 
+          alt="${component.name}"
+          className="w-full h-full object-cover rounded"
+        />`
+      default:
+        return `<div className="w-full h-full flex items-center justify-center bg-gray-100 rounded">
+          ${component.name}
+        </div>`
+    }
+  }
+
+  const generateStateVariables = (logicNodes: any[]): string => {
+    const stateVars = logicNodes
+      .filter(node => node.type === 'data' || node.type === 'api')
+      .map(node => `${node.name.toLowerCase().replace(/\s+/g, ''): null}`)
+      .join(',\n    ')
+    
+    return stateVars || '// No state variables needed'
+  }
+
+  const generateTriggerLogic = (triggerNode: any, connections: any[], logicNodes: any[]): string => {
+    const outgoingConnections = connections.filter(conn => conn.from === triggerNode.id)
+    let logic = ''
+    
+    outgoingConnections.forEach(conn => {
+      const targetNode = logicNodes.find(node => node.id === conn.to)
+      if (targetNode) {
+        if (targetNode.type === 'action') {
+          logic += `${targetNode.name.toLowerCase().replace(/\s+/g, '')}()\n    `
+        } else if (targetNode.type === 'api') {
+          logic += `await ${targetNode.name.toLowerCase().replace(/\s+/g, '')}()\n    `
+        }
+      }
+    })
+    
+    return logic || 'console.log("Trigger activated")'
+  }
+
+  const generateActionLogic = (actionNode: any, connections: any[], logicNodes: any[]): string => {
+    const outgoingConnections = connections.filter(conn => conn.from === actionNode.id)
+    let logic = ''
+    
+    outgoingConnections.forEach(conn => {
+      const targetNode = logicNodes.find(node => node.id === conn.to)
+      if (targetNode) {
+        if (targetNode.type === 'navigation') {
+          logic += `// Navigate to ${targetNode.data?.target || 'page'}\n    `
+        } else if (targetNode.type === 'style') {
+          logic += `// Apply styling\n    `
+        }
+      }
+    })
+    
+    return logic || 'console.log("Action executed")'
+  }
+
   return (
     <div className="h-screen bg-white flex flex-col font-['Inter'] font-semibold">
       {/* Top Bar */}
@@ -2265,8 +2417,8 @@ export default App;`
                 <div className="mb-4 p-2 bg-white border border-gray-200 rounded">
                   <div className="text-xs text-gray-500 mb-1">LOGIC MODE</div>
                   <div className="text-sm text-gray-900">
-                    {components.some(comp => comp.logic) ? (
-                      <span className="text-green-600">✓ Logic connections configured</span>
+                    {logicNodes.length > 0 && connections.length > 0 ? (
+                      <span className="text-green-600">✓ Logic connections configured ({logicNodes.length} nodes, {connections.length} connections)</span>
                     ) : (
                       <span className="text-yellow-600">⚠ No logic connections</span>
                     )}
