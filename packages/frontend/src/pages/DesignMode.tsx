@@ -5,33 +5,108 @@ import { useNavigate } from 'react-router-dom'
 import { ProjectService } from '@/services/projectService'
 import { useAuth } from '@/hooks/useAuth'
 import { 
-  Layout, 
-  Palette, 
+  Move, 
+  RotateCcw, 
+  Copy, 
+  Trash2, 
+  Eye, 
+  EyeOff, 
+  Lock, 
+  Unlock, 
   Layers, 
-  Database, 
-  Settings,
-  Plus,
-  Trash2,
-  
-  Move,
-  Eye,
-  EyeOff,
-  GitBranch,
-  Code,
-  Monitor,
+  Settings, 
+  Palette, 
+  Type, 
+  Image, 
+  Square, 
+  Circle, 
+  Triangle, 
+  Star, 
+  Heart, 
+  Zap, 
+  ChevronLeft, 
+  ChevronRight, 
+  ChevronDown,
+  Plus, 
+  Minus, 
+  RotateCw, 
+  AlignLeft, 
+  AlignCenter, 
+  AlignRight, 
+  Bold, 
+  Italic, 
+  Underline, 
+  Strikethrough, 
+  Link, 
+  Unlink, 
+  List, 
+  ListOrdered, 
+  Quote, 
+  Code, 
+  Heading1, 
+  Heading2, 
+  Heading3, 
+  AlignJustify, 
+  Indent, 
+  Outdent, 
+  Undo, 
+  Redo, 
+  Save, 
+  Download, 
+  Upload, 
+  Share, 
+  Layout,
+  Database,
   Smartphone,
-  Tablet,
   ZoomIn,
   ZoomOut,
-  RotateCcw,
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   Maximize2,
-  Square,
-  
-  
-  
+  GitBranch,
+  Eye as EyeIcon, 
+  EyeOff as EyeOffIcon, 
+  Lock as LockIcon, 
+  Unlock as UnlockIcon, 
+  Layers as LayersIcon, 
+  Settings as SettingsIcon, 
+  Palette as PaletteIcon, 
+  Type as TypeIcon, 
+  Image as ImageIcon, 
+  Square as SquareIcon, 
+  Circle as CircleIcon, 
+  Triangle as TriangleIcon, 
+  Star as StarIcon, 
+  Heart as HeartIcon, 
+  Zap as ZapIcon, 
+  ChevronLeft as ChevronLeftIcon, 
+  ChevronRight as ChevronRightIcon, 
+  Plus as PlusIcon, 
+  Minus as MinusIcon, 
+  RotateCw as RotateCwIcon, 
+  AlignLeft as AlignLeftIcon, 
+  AlignCenter as AlignCenterIcon, 
+  AlignRight as AlignRightIcon, 
+  Bold as BoldIcon, 
+  Italic as ItalicIcon, 
+  Underline as UnderlineIcon, 
+  Strikethrough as StrikethroughIcon, 
+  Link as LinkIcon, 
+  Unlink as UnlinkIcon, 
+  List as ListIcon, 
+  ListOrdered as ListOrderedIcon, 
+  Quote as QuoteIcon, 
+  Code as CodeIcon, 
+  Heading1 as Heading1Icon, 
+  Heading2 as Heading2Icon, 
+  Heading3 as Heading3Icon, 
+  AlignJustify as AlignJustifyIcon, 
+  Indent as IndentIcon, 
+  Outdent as OutdentIcon, 
+  Undo as UndoIcon, 
+  Redo as RedoIcon, 
+  Save as SaveIcon, 
+  Download as DownloadIcon, 
+  Upload as UploadIcon, 
+  Share as ShareIcon 
 } from 'lucide-react'
 
 interface Layer {
@@ -282,14 +357,14 @@ export function DesignMode({ projectId }: DesignModeProps) {
             console.log('Adding saved screen:', screen.name, screen.id)
             addScreen(screen)
           })
-          
+        
           console.log('Screens restored successfully. New count:', screens.length + savedScreens.length)
           
           // Set active screen after a short delay to ensure screens are loaded
           setTimeout(() => {
-            if (savedActiveScreen) {
+        if (savedActiveScreen) {
               console.log('Setting saved active screen after delay:', savedActiveScreen)
-              setActiveScreen(savedActiveScreen)
+          setActiveScreen(savedActiveScreen)
             } else if (savedScreens.length > 0) {
               console.log('Setting first screen as active after delay')
               setActiveScreen(savedScreens[0].id)
@@ -402,7 +477,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       
       // Force load after a short delay to ensure context is ready
       setTimeout(() => {
-        loadProjectData()
+      loadProjectData()
       }, 100)
       
       return () => clearTimeout(loadTimeout)
@@ -724,7 +799,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       width: 1024, 
       height: 1366, 
       type: 'tablet' as const, 
-      icon: Tablet,
+      icon: Smartphone,
       description: 'iOS 12.9" display',
       ratio: '4:3',
       category: 'iOS'
@@ -734,7 +809,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       width: 834, 
       height: 1194, 
       type: 'tablet' as const, 
-      icon: Tablet,
+      icon: Smartphone,
       description: 'iOS 11" display',
       ratio: '4:3',
       category: 'iOS'
@@ -744,7 +819,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       width: 820, 
       height: 1180, 
       type: 'tablet' as const, 
-      icon: Tablet,
+      icon: Smartphone,
       description: 'iOS 10.9" display',
       ratio: '4:3',
       category: 'iOS'
@@ -754,7 +829,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       width: 744, 
       height: 1133, 
       type: 'tablet' as const, 
-      icon: Tablet,
+      icon: Smartphone,
       description: 'iOS 8.3" display',
       ratio: '4:3',
       category: 'iOS'
@@ -826,7 +901,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       width: 1024, 
       height: 1366, 
       type: 'tablet' as const, 
-      icon: Tablet,
+      icon: Smartphone,
       description: 'Android 14.6" display',
       ratio: '4:3',
       category: 'Android'
@@ -836,7 +911,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       width: 834, 
       height: 1194, 
       type: 'tablet' as const, 
-      icon: Tablet,
+      icon: Smartphone,
       description: 'Android 12.4" display',
       ratio: '4:3',
       category: 'Android'
@@ -846,7 +921,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       width: 820, 
       height: 1180, 
       type: 'tablet' as const, 
-      icon: Tablet,
+      icon: Smartphone,
       description: 'Android 11" display',
       ratio: '4:3',
       category: 'Android'
@@ -858,7 +933,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       width: 1440, 
       height: 900, 
       type: 'desktop' as const, 
-      icon: Monitor,
+      icon: Smartphone,
       description: 'Standard desktop',
       ratio: '16:10',
       category: 'Desktop'
@@ -868,7 +943,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       width: 1920, 
       height: 1080, 
       type: 'desktop' as const, 
-      icon: Monitor,
+      icon: Smartphone,
       description: 'Full HD desktop',
       ratio: '16:9',
       category: 'Desktop'
@@ -878,7 +953,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       width: 2560, 
       height: 1080, 
       type: 'desktop' as const, 
-      icon: Monitor,
+      icon: Smartphone,
       description: 'Ultra-wide desktop',
       ratio: '21:9',
       category: 'Desktop'
@@ -1018,7 +1093,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
             const smoothFactor = 0.8 // Adjust this for more or less smoothing
             
             return {
-              ...prev,
+            ...prev,
               [draggedScreen]: { 
                 x: currentPos.x * smoothFactor + relativeX * (1 - smoothFactor),
                 y: currentPos.y * smoothFactor + relativeY * (1 - smoothFactor)
@@ -3020,8 +3095,8 @@ export function DesignMode({ projectId }: DesignModeProps) {
     }
     
     // Set initial position for the new screen
-    setScreenPositions(prev => ({
-      ...prev,
+      setScreenPositions(prev => ({
+        ...prev,
       [newScreen.id]: newPosition
     }))
     
@@ -3448,8 +3523,8 @@ export function DesignMode({ projectId }: DesignModeProps) {
                                     {screen.type}
                                   </span>
                                 </div>
-                                
-                                {/* Screen Dimensions */}
+                                  
+                                  {/* Screen Dimensions */}
                                 <div className="flex items-center justify-between">
                                   <span className="text-xs text-gray-500">
                                     {screen.width}×{screen.height}

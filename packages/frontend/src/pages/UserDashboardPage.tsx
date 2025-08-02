@@ -10,16 +10,10 @@ import {
   Trash2, 
   Eye, 
   Calendar, 
-  Clock, 
   Code, 
   Palette, 
-  GitBranch,
-  BarChart3,
-  TrendingUp,
   Activity,
-  Users,
   FileText,
-  Zap,
   Star,
   ArrowUpRight
 } from 'lucide-react'

@@ -58,7 +58,6 @@ export function CodeMode() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedFiles, setGeneratedFiles] = useState<FileNode[]>([])
   const [generationMessage, setGenerationMessage] = useState('')
-  const [currentMode, setCurrentMode] = useState<'design' | 'logic' | 'code'>('code')
 
   // Generate code from Design and Logic modes
   const generateCodeFromDesign = useCallback(() => {

@@ -3,9 +3,6 @@ import { Link, useLocation } from 'react-router-dom'
 import { AuthModal } from './AuthModal'
 import { 
   Layout as LayoutIcon, 
-  Palette, 
-  GitBranch, 
-  Code, 
   Settings, 
   User, 
   LogOut,
