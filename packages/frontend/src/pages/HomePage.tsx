@@ -300,7 +300,7 @@ export function HomePage() {
               {/* Design Interface Image */}
               <div className="mb-6 rounded-2xl overflow-hidden shadow-2xl border border-white/10">
                 <img 
-                  src="/image/Designe.png" 
+                  src="/Designe.png" 
                   alt="CTRL Design Interface" 
                   className="w-full h-auto object-cover"
                 />
@@ -315,7 +315,7 @@ export function HomePage() {
               {/* Logic Interface Image */}
               <div className="mb-6 rounded-2xl overflow-hidden shadow-2xl border border-white/10">
                 <img 
-                  src="/image/logic.png" 
+                  src="/logic.png" 
                   alt="CTRL Logic Interface" 
                   className="w-full h-auto object-cover"
                 />
@@ -330,7 +330,7 @@ export function HomePage() {
               {/* Code Interface Image */}
               <div className="mb-6 rounded-2xl overflow-hidden shadow-2xl border border-white/10">
                 <img 
-                  src="/image/code.png" 
+                  src="/code.png" 
                   alt="CTRL Code Interface" 
                   className="w-full h-auto object-cover"
                 />
