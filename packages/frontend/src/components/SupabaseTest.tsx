@@ -13,7 +13,7 @@ export function SupabaseTest() {
       setTestResult('Testing Supabase connection...')
       
       // Test 1: Check if we can connect to Supabase
-      const { data, error } = await supabase.from('projects').select('count').limit(1)
+      const { error } = await supabase.from('projects').select('count').limit(1)
       
       if (error) {
         setTestResult(`❌ Connection failed: ${error.message}`)

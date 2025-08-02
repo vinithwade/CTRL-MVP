@@ -47,7 +47,13 @@ interface EditorTab {
 export function CodeMode() {
   const { navigateToMode } = useNavigation()
   const { components, screens, logicNodes, connections } = useDesign()
-  const [activeTab, setActiveTab] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<string | null>('App.tsx')
+  const [sidebarWidth, setSidebarWidth] = useState(280)
+  const [activePanel, setActivePanel] = useState<'explorer' | 'search' | 'git' | 'debug'>('explorer')
+  const [isResizing, setIsResizing] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [editContent, setEditContent] = useState('')
+  const [editLanguage, setEditLanguage] = useState('typescript')
   const [tabs, setTabs] = useState<EditorTab[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedFiles, setGeneratedFiles] = useState<FileNode[]>([])
@@ -1917,8 +1923,6 @@ export default App;`
 }`
     }
   ])
-  const [sidebarWidth] = useState(250)
-  const [activePanel, setActivePanel] = useState<'explorer' | 'search' | 'git' | 'debug'>('explorer')
   const [terminalOutput, setTerminalOutput] = useState<string[]>([
     'Welcome to CTRL Code Mode Terminal',
     'Type "help" for available commands',

@@ -15,7 +15,7 @@ export function ConnectionTest() {
       setConnectionStatus('Testing connection...')
       
       // Test basic connection
-      const { data, error } = await supabase.from('projects').select('count').limit(1)
+      const { error } = await supabase.from('projects').select('count').limit(1)
       
       if (error) {
         setConnectionStatus(`❌ Connection failed: ${error.message}`)
@@ -33,7 +33,7 @@ export function ConnectionTest() {
       setAuthStatus('Testing auth...')
       
       // Test auth configuration
-      const { data: { session }, error } = await supabase.auth.getSession()
+      const { error } = await supabase.auth.getSession()
       
       if (error) {
         setAuthStatus(`❌ Auth failed: ${error.message}`)

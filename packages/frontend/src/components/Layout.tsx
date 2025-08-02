@@ -1,27 +1,22 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { AuthModal } from './AuthModal'
 import { 
-  Home, 
-  Brain, 
-  BarChart3, 
+  Layout as LayoutIcon, 
+  Palette, 
+  GitBranch, 
+  Code, 
   Settings, 
-  Menu, 
-  X,
-  User,
+  User, 
+  LogOut,
   Sparkles,
-  Zap,
-  Code,
-  Palette,
-  GitBranch,
   Github,
   Twitter,
-  LogOut
+  Menu,
+  X
 } from 'lucide-react'
-import { useState } from 'react'
-import { useNavigation } from '@/contexts/NavigationContext'
-import { useAuth } from '@/hooks/useAuth'
-import { AuthModal } from './AuthModal'
-import { TableSchemaTest } from './TableSchemaTest'
+import { useAuth } from '../hooks/useAuth'
+import { useDesign } from '../contexts/DesignContext'
 
 interface LayoutProps {
   children: ReactNode

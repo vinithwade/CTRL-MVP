@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { useNavigation } from '@/contexts/NavigationContext'
-import { useDesign, Component } from '@/contexts/DesignContext'
+import { useNavigation } from '../contexts/NavigationContext'
+import { useDesign, Component } from '../contexts/DesignContext'
 import { useNavigate } from 'react-router-dom'
 import { ProjectService } from '@/services/projectService'
 import { useAuth } from '@/hooks/useAuth'

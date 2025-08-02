@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useDesign } from '../contexts/DesignContext'
 import { CreateProjectModal } from '../components/CreateProjectModal'
 import { ProjectService, Project } from '../services/projectService'
 import { 

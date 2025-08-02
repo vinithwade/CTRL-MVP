@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom'
 export function ProfilePage() {
   const { user, logout, loading } = useAuth()
   const [email, setEmail] = useState(user?.email || '')
-  const [password, setPassword] = useState('')
   const [newEmail, setNewEmail] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [message, setMessage] = useState('')
@@ -41,7 +40,6 @@ export function ProfilePage() {
     if (error) setError(error.message)
     else {
       setMessage('Password updated!')
-      setPassword('')
       setNewPassword('')
     }
   }
