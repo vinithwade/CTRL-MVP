@@ -38,6 +38,7 @@ export function LogicMode() {
   const { 
     components, 
     screens, 
+    activeScreen,
     logicNodes, 
     connections, 
     addLogicNode, 
@@ -46,6 +47,18 @@ export function LogicMode() {
     addConnection, 
     deleteConnection 
   } = useDesign()
+  
+  // Get components that are actually used in the design mode (from active screen)
+  const getUsedComponents = () => {
+    if (!activeScreen) return []
+    const screen = screens.find(s => s.id === activeScreen)
+    if (!screen) return []
+    
+    // Get all components from all layers in the active screen
+    return screen.layers.flatMap(layer => layer.components)
+  }
+  
+  const usedComponents = getUsedComponents()
   const [isConnecting, setIsConnecting] = useState(false)
   const [connectionStart, setConnectionStart] = useState<string | null>(null)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
@@ -562,15 +575,15 @@ export function LogicMode() {
             <div className="p-4 border-b border-gray-200">
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Design Components</h3>
               <p className="text-xs text-gray-500 mb-3">Drag components to canvas</p>
-              {components.length === 0 ? (
+              {usedComponents.length === 0 ? (
                 <div className="text-center py-6 text-gray-500">
                   <Smartphone className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm">No components from Design Mode</p>
-                  <p className="text-xs">Create components in Design Mode first</p>
+                  <p className="text-sm">No components in current screen</p>
+                  <p className="text-xs">Add components to the active screen in Design Mode</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {components.map(component => (
+                  {usedComponents.map(component => (
                     <div 
                       key={component.id} 
                       className="bg-gray-50 rounded-lg p-3 cursor-move hover:bg-gray-100 transition-colors"
