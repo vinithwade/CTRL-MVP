@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { Brain, ArrowRight, Layout, GitBranch, Code, Zap, Sparkles, Star, CheckCircle, Play, Users, Globe, Shield, Zap as Lightning } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { AuthModal } from '../components/AuthModal'
 
 export function HomePage() {
@@ -9,6 +9,8 @@ export function HomePage() {
   const navigate = useNavigate()
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login')
+  const [isFeaturesVisible, setIsFeaturesVisible] = useState(false)
+  const featuresRef = useRef<HTMLDivElement>(null)
 
   const handleDevelopersClick = () => {
     if (isLoggedIn) {
@@ -22,6 +24,24 @@ export function HomePage() {
   const closeAuthModal = () => {
     setAuthModalOpen(false)
   }
+
+  // Scroll animation for Features section
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsFeaturesVisible(true)
+        }
+      },
+      { threshold: 0.3 }
+    )
+
+    if (featuresRef.current) {
+      observer.observe(featuresRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-blue-800 font-['Inter'] font-semibold">
@@ -135,7 +155,7 @@ export function HomePage() {
       </div>
 
       {/* Features Section */}
-      <div className="relative py-24 bg-gradient-to-br from-gray-900/50 to-blue-900/50">
+      <div ref={featuresRef} className="relative py-24 bg-gradient-to-br from-gray-900/50 to-blue-900/50 overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-semibold text-white mb-6 font-['Inter']">
@@ -149,9 +169,11 @@ export function HomePage() {
             </p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className={`grid grid-cols-1 md:grid-cols-3 gap-8 transform transition-all duration-1000 ease-out ${
+            isFeaturesVisible ? 'translate-x-0 opacity-100' : 'translate-x-20 opacity-0'
+          }`}>
             {/* Design Mode */}
-            <div className="group relative p-8 bg-white/5 backdrop-blur-sm rounded-3xl border border-white/10 hover:bg-white/10 transition-all duration-500 hover:scale-105 shadow-lg hover:shadow-xl">
+            <div className="group relative p-8 bg-white/5 backdrop-blur-sm rounded-3xl border border-white/10 hover:bg-white/10 transition-all duration-500 hover:scale-105 shadow-lg hover:shadow-xl transform transition-transform duration-700 ease-out hover:translate-x-[-10px]">
               <div className="relative">
                 <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 shadow-md">
                   <Layout className="w-8 h-8 text-white" />
@@ -160,17 +182,11 @@ export function HomePage() {
                 <p className="text-white/70 leading-relaxed font-['Inter']">
                   Drag-and-drop interface with real-time preview, responsive design tools, and component library.
                 </p>
-                <div className="mt-6">
-                  <Link to="/design" className="inline-flex items-center text-blue-300 hover:text-blue-200 font-semibold group font-['Inter']">
-                    Try Design Mode
-                    <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
-                  </Link>
-                </div>
               </div>
             </div>
 
             {/* Logic Mode */}
-            <div className="group relative p-8 bg-white/5 backdrop-blur-sm rounded-3xl border border-white/10 hover:bg-white/10 transition-all duration-500 hover:scale-105 shadow-lg hover:shadow-xl">
+            <div className="group relative p-8 bg-white/5 backdrop-blur-sm rounded-3xl border border-white/10 hover:bg-white/10 transition-all duration-500 hover:scale-105 shadow-lg hover:shadow-xl transform transition-transform duration-700 ease-out hover:translate-x-[-10px]">
               <div className="relative">
                 <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 shadow-md">
                   <GitBranch className="w-8 h-8 text-white" />
@@ -179,17 +195,11 @@ export function HomePage() {
                 <p className="text-white/70 leading-relaxed font-['Inter']">
                   Node-based programming for data flow, API integration, and business logic with visual connections.
                 </p>
-                <div className="mt-6">
-                  <Link to="/logic" className="inline-flex items-center text-blue-300 hover:text-blue-200 font-semibold group font-['Inter']">
-                    Try Logic Mode
-                    <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
-                  </Link>
-                </div>
               </div>
             </div>
 
             {/* Code Mode */}
-            <div className="group relative p-8 bg-white/5 backdrop-blur-sm rounded-3xl border border-white/10 hover:bg-white/10 transition-all duration-500 hover:scale-105 shadow-lg hover:shadow-xl">
+            <div className="group relative p-8 bg-white/5 backdrop-blur-sm rounded-3xl border border-white/10 hover:bg-white/10 transition-all duration-500 hover:scale-105 shadow-lg hover:shadow-xl transform transition-transform duration-700 ease-out hover:translate-x-[-10px]">
               <div className="relative">
                 <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 shadow-md">
                   <Code className="w-8 h-8 text-white" />
@@ -198,12 +208,6 @@ export function HomePage() {
                 <p className="text-white/70 leading-relaxed font-['Inter']">
                   Generate production-ready code for React, Vue, Angular, React Native, Flutter, and more.
                 </p>
-                <div className="mt-6">
-                  <Link to="/code" className="inline-flex items-center text-blue-300 hover:text-blue-200 font-semibold group font-['Inter']">
-                    Try Code Mode
-                    <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform duration-300" />
-                  </Link>
-                </div>
               </div>
             </div>
           </div>
