@@ -2180,13 +2180,13 @@ export default App;`
         functions += `
   const handle${node.name.replace(/\s+/g, '')} = () => {
     // Trigger logic for ${node.name}
-    ${generateTriggerLogic(node, connections, logicNodes)}
+    console.log("Trigger activated")
   }`
       } else if (node.type === 'action') {
         functions += `
   const ${node.name.toLowerCase().replace(/\s+/g, '')} = () => {
     // Action: ${node.name}
-    ${generateActionLogic(node, connections, logicNodes)}
+    console.log("Action executed")
   }`
       } else if (node.type === 'api') {
         functions += `
@@ -2257,42 +2257,6 @@ export default App;`
       .join(',\n    ')
     
     return stateVars || '// No state variables needed'
-  }
-
-  const generateTriggerLogic = (triggerNode: any, connections: any[], logicNodes: any[]): string => {
-    const outgoingConnections = connections.filter(conn => conn.from === triggerNode.id)
-    let logic = ''
-    
-    outgoingConnections.forEach(conn => {
-      const targetNode = logicNodes.find(node => node.id === conn.to)
-      if (targetNode) {
-        if (targetNode.type === 'action') {
-          logic += `${targetNode.name.toLowerCase().replace(/\s+/g, '')}()\n    `
-        } else if (targetNode.type === 'api') {
-          logic += `await ${targetNode.name.toLowerCase().replace(/\s+/g, '')}()\n    `
-        }
-      }
-    })
-    
-    return logic || 'console.log("Trigger activated")'
-  }
-
-  const generateActionLogic = (actionNode: any, connections: any[], logicNodes: any[]): string => {
-    const outgoingConnections = connections.filter(conn => conn.from === actionNode.id)
-    let logic = ''
-    
-    outgoingConnections.forEach(conn => {
-      const targetNode = logicNodes.find(node => node.id === conn.to)
-      if (targetNode) {
-        if (targetNode.type === 'navigation') {
-          logic += `// Navigate to ${targetNode.data?.target || 'page'}\n    `
-        } else if (targetNode.type === 'style') {
-          logic += `// Apply styling\n    `
-        }
-      }
-    })
-    
-    return logic || 'console.log("Action executed")'
   }
 
   return (
