@@ -297,15 +297,10 @@ export function HomePage() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             <div className="text-center group">
-              <div className="relative w-24 h-24 mx-auto mb-8">
-                <div className="relative w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-semibold group-hover:scale-110 transition-transform duration-300 shadow-lg overflow-hidden">
-                  <img src="/images/Design.png" alt="Design Icon" className="w-full h-full object-cover rounded-full" />
-                </div>
-              </div>
               {/* Design Interface Image */}
               <div className="mb-6 rounded-2xl overflow-hidden shadow-2xl border border-white/10">
                 <img 
-                  src="https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&h=600&fit=crop&crop=center" 
+                  src="/images/Design.png" 
                   alt="CTRL Design Interface" 
                   className="w-full h-auto object-cover"
                 />
@@ -317,10 +312,13 @@ export function HomePage() {
             </div>
             
             <div className="text-center group">
-              <div className="relative w-24 h-24 mx-auto mb-8">
-                <div className="relative w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-semibold group-hover:scale-110 transition-transform duration-300 shadow-lg overflow-hidden">
-                  <img src="/images/logic.png" alt="Logic Icon" className="w-full h-full object-cover rounded-full" />
-                </div>
+              {/* Logic Interface Image */}
+              <div className="mb-6 rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+                <img 
+                  src="/images/logic.png" 
+                  alt="CTRL Logic Interface" 
+                  className="w-full h-auto object-cover"
+                />
               </div>
               <h3 className="text-2xl font-semibold text-white mb-4 font-['Inter']">Connect Logic</h3>
               <p className="text-white/70 leading-relaxed font-['Inter']">
@@ -329,10 +327,13 @@ export function HomePage() {
             </div>
             
             <div className="text-center group">
-              <div className="relative w-24 h-24 mx-auto mb-8">
-                <div className="relative w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-2xl font-semibold group-hover:scale-110 transition-transform duration-300 shadow-lg overflow-hidden">
-                  <img src="/images/code.png" alt="Code Icon" className="w-full h-full object-cover rounded-full" />
-                </div>
+              {/* Code Interface Image */}
+              <div className="mb-6 rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+                <img 
+                  src="/images/code.png" 
+                  alt="CTRL Code Interface" 
+                  className="w-full h-auto object-cover"
+                />
               </div>
               <h3 className="text-2xl font-semibold text-white mb-4 font-['Inter']">Generate Code</h3>
               <p className="text-white/70 leading-relaxed font-['Inter']">
