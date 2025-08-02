@@ -89,7 +89,7 @@ export function HomePage() {
                   </div>
                   <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden hover:scale-110 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-300/50 transition-all duration-300 cursor-pointer group">
                     <img 
-                      src="https://images.unsplash.com/photo-1494790108755-2616b612b786?w=32&h=32&fit=crop&crop=face" 
+                      src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=32&h=32&fit=crop&crop=face" 
                       alt="Developer" 
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
@@ -232,7 +232,7 @@ export function HomePage() {
                 </div>
                 <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden hover:scale-125 hover:border-purple-300 hover:shadow-md hover:shadow-purple-300/50 transition-all duration-300 cursor-pointer group">
                   <img 
-                    src="https://images.unsplash.com/photo-1494790108755-2616b612b786?w=24&h=24&fit=crop&crop=face" 
+                    src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=24&h=24&fit=crop&crop=face" 
                     alt="Developer" 
                     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
