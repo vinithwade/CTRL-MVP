@@ -80,46 +80,46 @@ export function HomePage() {
               <div className="flex items-center space-x-2">
                 <div className="flex -space-x-2">
                   {/* Developer Profile Pictures */}
-                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden">
+                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden hover:scale-110 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-300/50 transition-all duration-300 cursor-pointer group">
                     <img 
                       src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=32&h=32&fit=crop&crop=face" 
                       alt="Developer" 
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>
-                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden">
+                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden hover:scale-110 hover:border-purple-300 hover:shadow-lg hover:shadow-purple-300/50 transition-all duration-300 cursor-pointer group">
                     <img 
                       src="https://images.unsplash.com/photo-1494790108755-2616b612b786?w=32&h=32&fit=crop&crop=face" 
                       alt="Developer" 
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>
-                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden">
+                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden hover:scale-110 hover:border-green-300 hover:shadow-lg hover:shadow-green-300/50 transition-all duration-300 cursor-pointer group">
                     <img 
                       src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=32&h=32&fit=crop&crop=face" 
                       alt="Developer" 
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>
-                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden">
+                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden hover:scale-110 hover:border-pink-300 hover:shadow-lg hover:shadow-pink-300/50 transition-all duration-300 cursor-pointer group">
                     <img 
                       src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=32&h=32&fit=crop&crop=face" 
                       alt="Developer" 
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>
-                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden">
+                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden hover:scale-110 hover:border-orange-300 hover:shadow-lg hover:shadow-orange-300/50 transition-all duration-300 cursor-pointer group">
                     <img 
                       src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=32&h=32&fit=crop&crop=face" 
                       alt="Developer" 
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>
-                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden">
+                  <div className="w-8 h-8 rounded-full border-2 border-white/20 overflow-hidden hover:scale-110 hover:border-indigo-300 hover:shadow-lg hover:shadow-indigo-300/50 transition-all duration-300 cursor-pointer group">
                     <img 
                       src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=32&h=32&fit=crop&crop=face" 
                       alt="Developer" 
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   </div>
                 </div>
@@ -223,46 +223,46 @@ export function HomePage() {
               <div className="text-white/70 font-['Inter'] mb-4">Developers</div>
               {/* Developer Profile Pictures */}
               <div className="flex justify-center -space-x-2 mb-2">
-                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden hover:scale-125 hover:border-blue-300 hover:shadow-md hover:shadow-blue-300/50 transition-all duration-300 cursor-pointer group">
                   <img 
                     src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=24&h=24&fit=crop&crop=face" 
                     alt="Developer" 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                 </div>
-                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden hover:scale-125 hover:border-purple-300 hover:shadow-md hover:shadow-purple-300/50 transition-all duration-300 cursor-pointer group">
                   <img 
                     src="https://images.unsplash.com/photo-1494790108755-2616b612b786?w=24&h=24&fit=crop&crop=face" 
                     alt="Developer" 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                 </div>
-                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden hover:scale-125 hover:border-green-300 hover:shadow-md hover:shadow-green-300/50 transition-all duration-300 cursor-pointer group">
                   <img 
                     src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=24&h=24&fit=crop&crop=face" 
                     alt="Developer" 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                 </div>
-                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden hover:scale-125 hover:border-pink-300 hover:shadow-md hover:shadow-pink-300/50 transition-all duration-300 cursor-pointer group">
                   <img 
                     src="https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=24&h=24&fit=crop&crop=face" 
                     alt="Developer" 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                 </div>
-                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden hover:scale-125 hover:border-orange-300 hover:shadow-md hover:shadow-orange-300/50 transition-all duration-300 cursor-pointer group">
                   <img 
                     src="https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=24&h=24&fit=crop&crop=face" 
                     alt="Developer" 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                 </div>
-                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden">
+                <div className="w-6 h-6 rounded-full border border-white/20 overflow-hidden hover:scale-125 hover:border-indigo-300 hover:shadow-md hover:shadow-indigo-300/50 transition-all duration-300 cursor-pointer group">
                   <img 
                     src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=24&h=24&fit=crop&crop=face" 
                     alt="Developer" 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                   />
                 </div>
               </div>
