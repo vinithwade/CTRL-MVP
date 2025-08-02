@@ -53,6 +53,24 @@ export interface LogicCondition {
   value?: any
 }
 
+export interface LogicNode {
+  id: string
+  type: 'component' | 'trigger' | 'condition' | 'action' | 'data' | 'navigation' | 'style' | 'api'
+  name: string
+  position: { x: number; y: number }
+  data: any
+  connections: string[]
+  componentId?: string
+  isDragging?: boolean
+}
+
+export interface Connection {
+  id: string
+  from: string
+  to: string
+  type: 'data' | 'control' | 'style'
+}
+
 export interface Layer {
   id: string
   name: string
@@ -75,6 +93,8 @@ interface DesignContextType {
   screens: Screen[]
   activeScreen: string | null
   components: Component[]
+  logicNodes: LogicNode[]
+  connections: Connection[]
   addComponent: (component: Component) => void
   updateComponent: (componentId: string, updates: Partial<Component>) => void
   deleteComponent: (componentId: string) => void
@@ -85,6 +105,12 @@ interface DesignContextType {
   addLogicToComponent: (componentId: string, logic: Component['logic']) => void
   getComponentById: (componentId: string) => Component | undefined
   getComponentsByScreen: (screenId: string) => Component[]
+  addLogicNode: (node: LogicNode) => void
+  updateLogicNode: (nodeId: string, updates: Partial<LogicNode>) => void
+  deleteLogicNode: (nodeId: string) => void
+  addConnection: (connection: Connection) => void
+  deleteConnection: (connectionId: string) => void
+  clearLogicData: () => void
 }
 
 const DesignContext = createContext<DesignContextType | undefined>(undefined)
@@ -93,6 +119,8 @@ export function DesignProvider({ children }: { children: ReactNode }) {
   const [screens, setScreens] = useState<Screen[]>([])
   const [activeScreen, setActiveScreen] = useState<string | null>(null)
   const [components, setComponents] = useState<Component[]>([])
+  const [logicNodes, setLogicNodes] = useState<LogicNode[]>([])
+  const [connections, setConnections] = useState<Connection[]>([])
 
   const addComponent = (component: Component) => {
     setComponents(prev => [...prev, component])
@@ -144,11 +172,41 @@ export function DesignProvider({ children }: { children: ReactNode }) {
     return screen.layers.flatMap(layer => layer.components)
   }
 
+  const addLogicNode = (node: LogicNode) => {
+    setLogicNodes(prev => [...prev, node])
+  }
+
+  const updateLogicNode = (nodeId: string, updates: Partial<LogicNode>) => {
+    setLogicNodes(prev => prev.map(node => 
+      node.id === nodeId ? { ...node, ...updates } : node
+    ))
+  }
+
+  const deleteLogicNode = (nodeId: string) => {
+    setLogicNodes(prev => prev.filter(node => node.id !== nodeId))
+    setConnections(prev => prev.filter(conn => conn.from !== nodeId && conn.to !== nodeId))
+  }
+
+  const addConnection = (connection: Connection) => {
+    setConnections(prev => [...prev, connection])
+  }
+
+  const deleteConnection = (connectionId: string) => {
+    setConnections(prev => prev.filter(conn => conn.id !== connectionId))
+  }
+
+  const clearLogicData = () => {
+    setLogicNodes([])
+    setConnections([])
+  }
+
   return (
     <DesignContext.Provider value={{
       screens,
       activeScreen,
       components,
+      logicNodes,
+      connections,
       addComponent,
       updateComponent,
       deleteComponent,
@@ -158,7 +216,13 @@ export function DesignProvider({ children }: { children: ReactNode }) {
       setActiveScreen,
       addLogicToComponent,
       getComponentById,
-      getComponentsByScreen
+      getComponentsByScreen,
+      addLogicNode,
+      updateLogicNode,
+      deleteLogicNode,
+      addConnection,
+      deleteConnection,
+      clearLogicData
     }}>
       {children}
     </DesignContext.Provider>

@@ -35,9 +35,17 @@ interface Connection {
 
 export function LogicMode() {
   const { navigateToMode } = useNavigation()
-  const { components, screens } = useDesign()
-  const [nodes, setNodes] = useState<LogicNode[]>([])
-  const [connections, setConnections] = useState<Connection[]>([])
+  const { 
+    components, 
+    screens, 
+    logicNodes, 
+    connections, 
+    addLogicNode, 
+    updateLogicNode, 
+    deleteLogicNode, 
+    addConnection, 
+    deleteConnection 
+  } = useDesign()
   const [isConnecting, setIsConnecting] = useState(false)
   const [connectionStart, setConnectionStart] = useState<string | null>(null)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 })
@@ -110,17 +118,17 @@ export function LogicMode() {
     const newNode: LogicNode = {
       id: Date.now().toString(),
       type,
-      name: type === 'component' ? data?.name || 'Component' : `${nodeTypes[type as keyof typeof nodeTypes]?.label || type} ${nodes.filter(n => n.type === type).length + 1}`,
+      name: type === 'component' ? data?.name || 'Component' : `${nodeTypes[type as keyof typeof nodeTypes]?.label || type} ${logicNodes.filter(n => n.type === type).length + 1}`,
       position,
       data: data || {},
       connections: [],
       componentId
     }
-    setNodes(prev => [...prev, newNode])
+    addLogicNode(newNode)
     return newNode
   }
 
-  const addConnection = (from: string, to: string, type: 'data' | 'control' | 'style' = 'control') => {
+  const createConnection = (from: string, to: string, type: 'data' | 'control' | 'style' = 'control') => {
     // Check if connection already exists
     const existingConnection = connections.find(conn => conn.from === from && conn.to === to)
     if (existingConnection) return
@@ -131,15 +139,13 @@ export function LogicMode() {
       to,
       type
     }
-    setConnections(prev => [...prev, newConnection])
+    addConnection(newConnection)
     
     // Update node connections
-    setNodes(prev => prev.map(node => {
-      if (node.id === from) {
-        return { ...node, connections: [...node.connections, newConnection.id] }
-      }
-      return node
-    }))
+    const fromNode = logicNodes.find(n => n.id === from)
+    if (fromNode) {
+      updateLogicNode(from, { connections: [...fromNode.connections, newConnection.id] })
+    }
   }
 
   const startConnection = (nodeId: string) => {
@@ -149,7 +155,7 @@ export function LogicMode() {
 
   const finishConnection = (nodeId: string) => {
     if (isConnecting && connectionStart && connectionStart !== nodeId) {
-      addConnection(connectionStart, nodeId, 'control')
+      createConnection(connectionStart, nodeId, 'control')
     }
     setIsConnecting(false)
     setConnectionStart(null)
@@ -161,14 +167,17 @@ export function LogicMode() {
   }
 
   const updateNode = (nodeId: string, updates: Partial<LogicNode>) => {
-    setNodes(prev => prev.map(node => 
-      node.id === nodeId ? { ...node, ...updates } : node
-    ))
+    updateLogicNode(nodeId, updates)
   }
 
   const deleteNode = (nodeId: string) => {
-    setNodes(prev => prev.filter(node => node.id !== nodeId))
-    setConnections(prev => prev.filter(conn => conn.from !== nodeId && conn.to !== nodeId))
+    deleteLogicNode(nodeId)
+    // Delete all connections involving this node
+    connections.forEach(conn => {
+      if (conn.from === nodeId || conn.to === nodeId) {
+        deleteConnection(conn.id)
+      }
+    })
   }
 
   const handleNodeDrag = (nodeId: string, position: { x: number; y: number }) => {
@@ -805,10 +814,10 @@ export function LogicMode() {
           />
 
           {/* Nodes */}
-          {nodes.map(renderNode)}
+          {logicNodes.map(renderNode)}
 
           {/* Empty State */}
-          {nodes.length === 0 && (
+          {logicNodes.length === 0 && (
             <div className="absolute inset-8 flex items-center justify-center">
               <div className="text-center text-gray-500 bg-white/80 backdrop-blur-sm rounded-lg p-8 border border-gray-200 shadow-sm">
                 <GitBranch className="h-16 w-16 mx-auto mb-4 text-gray-300" />
@@ -823,8 +832,8 @@ export function LogicMode() {
         {/* Connections - Rendered outside transformed container */}
         <div className="absolute inset-0 pointer-events-none z-10">
           {connections.map(connection => {
-            const fromNode = nodes.find(n => n.id === connection.from)
-            const toNode = nodes.find(n => n.id === connection.to)
+            const fromNode = logicNodes.find(n => n.id === connection.from)
+            const toNode = logicNodes.find(n => n.id === connection.to)
             
             if (!fromNode || !toNode) return null
 
@@ -890,7 +899,7 @@ export function LogicMode() {
 
         {/* Temporary Connection Line - Also outside transformed container */}
         {isConnecting && connectionStart && (() => {
-          const fromNode = nodes.find(n => n.id === connectionStart)
+          const fromNode = logicNodes.find(n => n.id === connectionStart)
           if (!fromNode) return null
 
           let fromX, fromY
