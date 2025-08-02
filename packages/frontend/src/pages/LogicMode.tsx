@@ -999,7 +999,7 @@ export function LogicMode() {
       )}
 
       {/* Mode Navigation Buttons - Pill Style */}
-      <div className="fixed bottom-4 right-4 flex space-x-2">
+      <div className="fixed bottom-4 right-4 flex space-x-2 z-50">
         <button
           onClick={() => navigateToMode('design')}
           className="flex items-center space-x-2 px-4 py-2 bg-orange-500 text-white rounded-lg shadow-lg hover:bg-orange-600 transition-colors"
