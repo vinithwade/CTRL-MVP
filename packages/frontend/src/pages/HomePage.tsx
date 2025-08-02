@@ -300,7 +300,7 @@ export function HomePage() {
               {/* Design Interface Image */}
               <div className="mb-6 rounded-2xl overflow-hidden shadow-2xl border border-white/10">
                 <img 
-                  src="/image/Design.png" 
+                  src="/image/Designe.png" 
                   alt="CTRL Design Interface" 
                   className="w-full h-auto object-cover"
                 />
