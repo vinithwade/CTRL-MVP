@@ -30,6 +30,8 @@ image/
 # Ignore git
 .git/
 
-# Ignore node_modules (will be installed by Vercel)
+# Ignore root node_modules (will be installed by Vercel)
 node_modules/
-packages/*/node_modules/ 
+
+# Keep frontend package and its dependencies
+!packages/frontend/ 
