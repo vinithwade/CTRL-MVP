@@ -55,7 +55,6 @@ export function CodeMode() {
   const [generatedFiles, setGeneratedFiles] = useState<FileNode[]>([])
   const [generationMessage, setGenerationMessage] = useState('')
 
-  const allComponentsCode = generateAllComponentsCode(components)
 
   const generateCodeFromDesign = useCallback(() => {
     // Check if files already exist
@@ -202,7 +201,7 @@ export function CodeMode() {
 
   const generateAppComponent = (components: any[]): string => {
     // Generate logic functions based on connections
-    const logicFunctions = generateLogicFunctions(logicNodes, connections)
+    const logicFunctions = generateLogicFunctions(logicNodes)
     
     // Generate component JSX with event handlers
     const componentJSX = components.map(comp => {
@@ -2233,7 +2232,7 @@ export default App;`
   const activeTabData = tabs.find(tab => tab.id === activeTab)
 
   // Helper functions for logic generation
-  const generateLogicFunctions = (logicNodes: any[], connections: any[]): string => {
+  const generateLogicFunctions = (logicNodes: any[]): string => {
     let functions = ''
     
     // Generate functions for each logic node

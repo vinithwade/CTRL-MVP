@@ -1172,50 +1172,9 @@ export function DesignMode({ projectId }: DesignModeProps) {
     }
   }, [isPanning, panStart, draggedScreen, screenDragOffset, pan, zoom, isDragging, selectedComponent, selectedComponentData, dragOffset, isResizing, resizeHandle, activeScreen, screens, screenPositions])
 
-  const addLayer = () => {
-    if (!currentScreen) return
 
-    const newLayer: Layer = {
-      id: Date.now().toString(),
-      name: `Layer ${currentScreen.layers.length + 1}`,
-      visible: true,
-      locked: false,
-      components: []
-    }
-    
-    updateScreen(activeScreen!, {
-      layers: [...currentScreen.layers, newLayer]
-    })
-  }
 
-  const deleteLayer = (layerId: string) => {
-    if (!currentScreen || currentScreen.layers.length <= 1) return
 
-    updateScreen(activeScreen!, {
-      layers: currentScreen.layers.filter(layer => layer.id !== layerId),
-      activeLayer: currentScreen.activeLayer === layerId ? currentScreen.layers[0].id : currentScreen.activeLayer
-    })
-  }
-
-  const toggleLayerVisibility = (layerId: string) => {
-    if (!currentScreen) return
-    
-    updateScreen(activeScreen!, {
-      layers: currentScreen.layers.map(layer => 
-        layer.id === layerId ? { ...layer, visible: !layer.visible } : layer
-      )
-    })
-  }
-
-  const toggleLayerLock = (layerId: string) => {
-    if (!currentScreen) return
-    
-    updateScreen(activeScreen!, {
-      layers: currentScreen.layers.map(layer => 
-        layer.id === layerId ? { ...layer, locked: !layer.locked } : layer
-      )
-    })
-  }
 
   // const addVariable = () => {
   //   const newVariable: Variable = {
@@ -2331,12 +2290,6 @@ export function DesignMode({ projectId }: DesignModeProps) {
   }
 
   // Toggle sidebar sections
-  const toggleSidebarSection = (section: keyof typeof sidebarStates) => {
-    setSidebarStates(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }))
-  }
 
   // Component resize handlers
   const handleResizeStart = (e: React.MouseEvent, component: Component, handle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w') => {
