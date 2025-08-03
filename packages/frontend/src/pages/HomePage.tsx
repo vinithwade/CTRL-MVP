@@ -107,7 +107,7 @@ export function HomePage() {
             {/* Badge */}
             <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white/80 text-sm font-medium mb-8 shadow-sm">
               <Sparkles className="w-4 h-4 mr-2" />
-              AI-Powered UI Development
+              AI-Powered Development
             </div>
             
             {/* Main Heading */}
