@@ -57,15 +57,12 @@ export function HomePage() {
             
             {/* Main Heading */}
             <h1 className="text-5xl md:text-7xl font-semibold text-white mb-6 leading-tight font-['Inter']">
-              The universal development platform
-              <span className="block text-blue-200">
-                for the AI era
-              </span>
+              CTRL: One Flow. No Handoffs.
             </h1>
             
             {/* Subtitle */}
             <p className="text-xl md:text-2xl text-white/80 max-w-4xl mx-auto mb-12 leading-relaxed font-['SupermemoryFont']">
-              From visual design to production-ready code, CTRL provides the complete toolkit for modern development.
+              Visually create and sync design, logic, and code in real-time. No tool-switching. No bottlenecks.
             </p>
             
             {/* CTA Buttons */}
