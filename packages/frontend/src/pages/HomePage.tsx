@@ -10,6 +10,10 @@ export function HomePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login')
   const [isFeaturesVisible, setIsFeaturesVisible] = useState(false)
+  const [waitlistModalOpen, setWaitlistModalOpen] = useState(false)
+  const [email, setEmail] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSuccess, setIsSuccess] = useState(false)
   const featuresRef = useRef<HTMLDivElement>(null)
 
   // Add custom CSS for shining animation
@@ -43,6 +47,37 @@ export function HomePage() {
 
   const closeAuthModal = () => {
     setAuthModalOpen(false)
+  }
+
+  const handleWaitlistClick = () => {
+    setWaitlistModalOpen(true)
+  }
+
+  const closeWaitlistModal = () => {
+    setWaitlistModalOpen(false)
+    setEmail('')
+    setIsSubmitting(false)
+    setIsSuccess(false)
+  }
+
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!email) return
+
+    setIsSubmitting(true)
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1500))
+    
+    // Here you would typically save to your backend
+    // For now, we'll just simulate success
+    setIsSuccess(true)
+    setIsSubmitting(false)
+    
+    // Auto close after 3 seconds
+    setTimeout(() => {
+      closeWaitlistModal()
+    }, 3000)
   }
 
   // Scroll animation for Features section
@@ -110,7 +145,10 @@ export function HomePage() {
                 </div>
               </button>
 
-              <button className="group relative px-8 py-4 bg-transparent backdrop-blur-sm border border-white/20 rounded-2xl text-white/70 font-semibold text-lg hover:bg-white/10 transition-all duration-300 hover:scale-105 shadow-sm hover:shadow-md font-['Inter']">
+              <button 
+                onClick={handleWaitlistClick}
+                className="group relative px-8 py-4 bg-transparent backdrop-blur-sm border border-white/20 rounded-2xl text-white/70 font-semibold text-lg hover:bg-white/10 transition-all duration-300 hover:scale-105 shadow-sm hover:shadow-md font-['Inter']"
+              >
                 <div className="relative flex items-center">
                   Join the Waitlist
                   <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
@@ -420,7 +458,10 @@ export function HomePage() {
                 Watch Demo
               </div>
             </button>
-            <button className="group relative px-8 py-4 bg-transparent backdrop-blur-sm border border-white/20 rounded-2xl text-white/70 font-semibold text-lg hover:bg-white/10 transition-all duration-300 hover:scale-105 shadow-sm hover:shadow-md font-['Inter']">
+            <button 
+              onClick={handleWaitlistClick}
+              className="group relative px-8 py-4 bg-transparent backdrop-blur-sm border border-white/20 rounded-2xl text-white/70 font-semibold text-lg hover:bg-white/10 transition-all duration-300 hover:scale-105 shadow-sm hover:shadow-md font-['Inter']"
+            >
               <div className="relative flex items-center">
                 Join the Waitlist
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
@@ -429,6 +470,89 @@ export function HomePage() {
           </div>
         </div>
       </div>
+
+      {/* Waitlist Modal */}
+      {waitlistModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="relative bg-gradient-to-br from-gray-900 to-blue-900 rounded-3xl border border-white/20 p-8 max-w-md w-full shadow-2xl">
+            {!isSuccess ? (
+              <>
+                <div className="text-center mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Sparkles className="w-8 h-8 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-semibold text-white mb-2 font-['Inter']">
+                    Join the Waitlist
+                  </h3>
+                  <p className="text-white/70 font-['Inter']">
+                    Be the first to know when CTRL launches. Get early access and exclusive updates.
+                  </p>
+                </div>
+                
+                <form onSubmit={handleWaitlistSubmit} className="space-y-4">
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-white/80 mb-2 font-['Inter']">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      id="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent font-['Inter']"
+                      required
+                    />
+                  </div>
+                  
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed font-['Inter']"
+                  >
+                    {isSubmitting ? (
+                      <div className="flex items-center justify-center">
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                        Joining...
+                      </div>
+                    ) : (
+                      'Join Waitlist'
+                    )}
+                  </button>
+                </form>
+                
+                <button
+                  onClick={closeWaitlistModal}
+                  className="absolute top-4 right-4 text-white/60 hover:text-white transition-colors"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </>
+            ) : (
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-semibold text-white mb-2 font-['Inter']">
+                  Congratulations! 🎉
+                </h3>
+                <p className="text-white/70 font-['Inter'] mb-4">
+                  You've successfully joined the CTRL waitlist. We'll notify you as soon as we launch!
+                </p>
+                <div className="bg-green-500/20 border border-green-500/30 rounded-xl p-4">
+                  <p className="text-green-300 text-sm font-['Inter']">
+                    ✓ You're now on the exclusive waitlist
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       <AuthModal
         isOpen={authModalOpen}
