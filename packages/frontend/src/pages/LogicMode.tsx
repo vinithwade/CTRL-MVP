@@ -196,14 +196,6 @@ export function LogicMode() {
     updateNode(nodeId, { position })
   }
 
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    if (e.target === canvasRef.current) {
-      setSelectedNode(null)
-      setSidebarVisible(false)
-      cancelConnection()
-    }
-  }
-
   const handleMouseMove = (e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect()
     if (rect) {

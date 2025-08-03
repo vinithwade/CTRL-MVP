@@ -4022,7 +4022,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
           }}
           onMouseDown={handleMouseDownPan}
           onMouseMove={handleMouseMovePan}
-          onMouseUp={(_e) => {
+          onMouseUp={() => {
             if (activeTool === 'select') {
               handleMouseUpPan()
             } else {
@@ -4110,7 +4110,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
                   handleCanvasMouseMove(e)
                 }
               }}
-              onMouseUp={(e) => {
+              onMouseUp={() => {
                 if (activeTool === 'select') {
                   handleMouseUpPan()
                 } else {
