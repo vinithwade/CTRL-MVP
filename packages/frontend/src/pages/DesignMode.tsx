@@ -2327,65 +2327,65 @@ export function DesignMode({ projectId }: DesignModeProps) {
         // Calculate deltas from the resize start position
         const deltaX = mouseX - resizeStartPos.x
         const deltaY = mouseY - resizeStartPos.y
-        
-        let newWidth = resizeStartSize.width
-        let newHeight = resizeStartSize.height
-        let newX = selectedComponent.position.x
-        let newY = selectedComponent.position.y
-        
-        // Calculate new size and position based on resize handle
-        switch (resizeHandle) {
-          case 'se': // bottom-right
-            newWidth = Math.max(20, resizeStartSize.width + deltaX)
-            newHeight = Math.max(20, resizeStartSize.height + deltaY)
-            break
-          case 'sw': // bottom-left
-            newWidth = Math.max(20, resizeStartSize.width - deltaX)
-            newHeight = Math.max(20, resizeStartSize.height + deltaY)
+            
+            let newWidth = resizeStartSize.width
+            let newHeight = resizeStartSize.height
+            let newX = selectedComponent.position.x
+            let newY = selectedComponent.position.y
+            
+            // Calculate new size and position based on resize handle
+            switch (resizeHandle) {
+              case 'se': // bottom-right
+                newWidth = Math.max(20, resizeStartSize.width + deltaX)
+                newHeight = Math.max(20, resizeStartSize.height + deltaY)
+                break
+              case 'sw': // bottom-left
+                newWidth = Math.max(20, resizeStartSize.width - deltaX)
+                newHeight = Math.max(20, resizeStartSize.height + deltaY)
             newX = selectedComponent.position.x + resizeStartSize.width - newWidth
-            break
-          case 'ne': // top-right
-            newWidth = Math.max(20, resizeStartSize.width + deltaX)
-            newHeight = Math.max(20, resizeStartSize.height - deltaY)
+                break
+              case 'ne': // top-right
+                newWidth = Math.max(20, resizeStartSize.width + deltaX)
+                newHeight = Math.max(20, resizeStartSize.height - deltaY)
             newY = selectedComponent.position.y + resizeStartSize.height - newHeight
-            break
-          case 'nw': // top-left
-            newWidth = Math.max(20, resizeStartSize.width - deltaX)
-            newHeight = Math.max(20, resizeStartSize.height - deltaY)
+                break
+              case 'nw': // top-left
+                newWidth = Math.max(20, resizeStartSize.width - deltaX)
+                newHeight = Math.max(20, resizeStartSize.height - deltaY)
             newX = selectedComponent.position.x + resizeStartSize.width - newWidth
             newY = selectedComponent.position.y + resizeStartSize.height - newHeight
-            break
-          case 'e': // right
-            newWidth = Math.max(20, resizeStartSize.width + deltaX)
-            break
-          case 'w': // left
-            newWidth = Math.max(20, resizeStartSize.width - deltaX)
+                break
+              case 'e': // right
+                newWidth = Math.max(20, resizeStartSize.width + deltaX)
+                break
+              case 'w': // left
+                newWidth = Math.max(20, resizeStartSize.width - deltaX)
             newX = selectedComponent.position.x + resizeStartSize.width - newWidth
-            break
-          case 's': // bottom
-            newHeight = Math.max(20, resizeStartSize.height + deltaY)
-            break
-          case 'n': // top
-            newHeight = Math.max(20, resizeStartSize.height - deltaY)
+                break
+              case 's': // bottom
+                newHeight = Math.max(20, resizeStartSize.height + deltaY)
+                break
+              case 'n': // top
+                newHeight = Math.max(20, resizeStartSize.height - deltaY)
             newY = selectedComponent.position.y + resizeStartSize.height - newHeight
-            break
-        }
-        
+                break
+            }
+            
         // Constrain to screen bounds
         const currentScreen = screens.find(s => s.id === activeScreen)
-        if (currentScreen) {
-          // Clamp width/height so the component doesn't go outside the screen
+            if (currentScreen) {
+              // Clamp width/height so the component doesn't go outside the screen
           newWidth = Math.min(newWidth, currentScreen.width - newX)
           newHeight = Math.min(newHeight, currentScreen.height - newY)
-          // Clamp position so the component doesn't go outside the screen
+              // Clamp position so the component doesn't go outside the screen
           newX = Math.max(0, Math.min(newX, currentScreen.width - newWidth))
           newY = Math.max(0, Math.min(newY, currentScreen.height - newHeight))
-        }
-        
-        updateComponentLocal(selectedComponent.id, {
-          position: { x: newX, y: newY },
-          size: { width: newWidth, height: newHeight }
-        })
+            }
+            
+            updateComponentLocal(selectedComponent.id, {
+              position: { x: newX, y: newY },
+              size: { width: newWidth, height: newHeight }
+            })
       }
     }
   }
