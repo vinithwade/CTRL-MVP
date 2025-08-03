@@ -223,9 +223,11 @@ export function LogicMode() {
     if (e.key === 'Delete' && selectedNode) {
       deleteNode(selectedNode.id)
       setSelectedNode(null)
+      setSidebarVisible(false)
     }
     if (e.key === 'Escape') {
       setSelectedNode(null)
+      setSidebarVisible(false)
       cancelConnection()
     }
   }
