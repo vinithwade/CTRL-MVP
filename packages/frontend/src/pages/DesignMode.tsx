@@ -13,8 +13,6 @@ import {
   Palette, 
   Square, 
   ChevronDown,
-  
-  
   Layout,
   Database,
   Smartphone,
@@ -22,7 +20,15 @@ import {
   ZoomOut,
   Maximize2,
   GitBranch,
-  Code
+  Code,
+  Circle,
+  Triangle,
+  Type,
+  Image,
+  MousePointer,
+  PenTool,
+  Minus,
+  Plus
 } from 'lucide-react'
 
 interface Layer {
@@ -2974,31 +2980,17 @@ export function DesignMode({ projectId }: DesignModeProps) {
         const centerY = containerRect.height / 2
         
         // Calculate pan to center the new screen
-        const targetPanX = centerX - (newPosition.x + newScreen.width / 2) * zoom
-        const targetPanY = centerY - (newPosition.y + newScreen.height / 2) * zoom
+        const newScreenX = newPosition.x + newScreen.width / 2
+        const newScreenY = newPosition.y + newScreen.height / 2
         
         setPan({
-          x: targetPanX,
-          y: targetPanY
+          x: centerX - newScreenX * zoom,
+          y: centerY - newScreenY * zoom
         })
       }
-    }, 50)
-    
-    // Reset the flag after a short delay
-    setTimeout(() => {
-      console.log('Screen creation completed, resetting flag')
-      setIsCreatingScreen(false)
-      
-      // Trigger save when screen is created
-      if (projectId) {
-        console.log('Screen created, triggering save...')
-        setTimeout(() => {
-          if (!isSaving && !isLoadingData) {
-            saveProjectData()
-          }
-        }, 5000) // 5 second delay to prevent rapid saves
-      }
     }, 100)
+    
+    setIsCreatingScreen(false)
   }
 
   // Fetch project information
@@ -3024,6 +3016,85 @@ export function DesignMode({ projectId }: DesignModeProps) {
   useEffect(() => {
     fetchProjectInfo()
   }, [fetchProjectInfo])
+
+  // Toolbar state
+  const [activeTool, setActiveTool] = useState<'select' | 'rectangle' | 'circle' | 'triangle' | 'text' | 'image' | 'line'>('select')
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [drawingStart, setDrawingStart] = useState({ x: 0, y: 0 })
+  const [currentDrawing, setCurrentDrawing] = useState<any>(null)
+
+  // Toolbar functions
+  const handleToolSelect = (tool: 'select' | 'rectangle' | 'circle' | 'triangle' | 'text' | 'image' | 'line') => {
+    setActiveTool(tool)
+  }
+
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    if (activeTool === 'select') {
+      // Handle selection
+      return
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = (e.clientX - rect.left - pan.x) / zoom
+    const y = (e.clientY - rect.top - pan.y) / zoom
+
+    setIsDrawing(true)
+    setDrawingStart({ x, y })
+
+    // Create a temporary drawing element
+    const drawingElement = {
+      type: activeTool,
+      x,
+      y,
+      width: 0,
+      height: 0,
+      id: Date.now().toString()
+    }
+
+    setCurrentDrawing(drawingElement)
+  }
+
+  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+    if (!isDrawing || !currentDrawing) return
+
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = (e.clientX - rect.left - pan.x) / zoom
+    const y = (e.clientY - rect.top - pan.y) / zoom
+
+    const width = Math.abs(x - drawingStart.x)
+    const height = Math.abs(y - drawingStart.y)
+
+    setCurrentDrawing({
+      ...currentDrawing,
+      width,
+      height
+    })
+  }
+
+  const handleCanvasMouseUp = () => {
+    if (!isDrawing || !currentDrawing) return
+
+    // Convert drawing to component
+    const component: Component = {
+      id: currentDrawing.id,
+      name: `${activeTool.charAt(0).toUpperCase() + activeTool.slice(1)} ${Date.now()}`,
+      type: activeTool,
+      position: { x: currentDrawing.x, y: currentDrawing.y },
+      size: { width: Math.max(currentDrawing.width, 20), height: Math.max(currentDrawing.height, 20) },
+      backgroundColor: '#3b82f6',
+      zIndex: 1,
+      props: {}
+    }
+
+    // Add component to active screen
+    if (activeScreen) {
+      addComponent(component)
+    }
+
+    setIsDrawing(false)
+    setCurrentDrawing(null)
+    setActiveTool('select')
+  }
 
   return (
     <div className="h-screen flex bg-gray-50 font-['Inter'] font-semibold">
@@ -4031,10 +4102,41 @@ export function DesignMode({ projectId }: DesignModeProps) {
             {/* Background element for pan events */}
             <div 
               className="absolute inset-0"
-              onMouseDown={handleMouseDownPan}
-              onMouseMove={handleMouseMovePan}
-              onMouseUp={handleMouseUpPan}
+              onMouseDown={(e) => {
+                if (activeTool === 'select') {
+                  handleMouseDownPan(e)
+                } else {
+                  handleCanvasMouseDown(e)
+                }
+              }}
+              onMouseMove={(e) => {
+                if (activeTool === 'select') {
+                  handleMouseMovePan(e)
+                } else {
+                  handleCanvasMouseMove(e)
+                }
+              }}
+              onMouseUp={(e) => {
+                if (activeTool === 'select') {
+                  handleMouseUpPan()
+                } else {
+                  handleCanvasMouseUp()
+                }
+              }}
             />
+            
+            {/* Drawing Preview */}
+            {isDrawing && currentDrawing && (
+              <div
+                className="absolute border-2 border-blue-500 bg-blue-500 bg-opacity-20 pointer-events-none"
+                style={{
+                  left: currentDrawing.x,
+                  top: currentDrawing.y,
+                  width: Math.max(currentDrawing.width, 1),
+                  height: Math.max(currentDrawing.height, 1)
+                }}
+              />
+            )}
             
             {/* Empty State */}
             {screens.length === 0 && (
@@ -4560,6 +4662,112 @@ export function DesignMode({ projectId }: DesignModeProps) {
                         </div>
                         </div>
         )}
+      </div>
+
+      {/* Figma-like Toolbar */}
+      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-2 z-50">
+        <div className="flex items-center space-x-2">
+          {/* Select Tool */}
+          <button
+            onClick={() => handleToolSelect('select')}
+            className={`p-2 rounded-lg transition-all duration-200 ${
+              activeTool === 'select' 
+                ? 'bg-blue-500 text-white shadow-md' 
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Select (V)"
+          >
+            <MousePointer className="w-5 h-5" />
+          </button>
+
+          {/* Rectangle Tool */}
+          <button
+            onClick={() => handleToolSelect('rectangle')}
+            className={`p-2 rounded-lg transition-all duration-200 ${
+              activeTool === 'rectangle' 
+                ? 'bg-blue-500 text-white shadow-md' 
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Rectangle (R)"
+          >
+            <Square className="w-5 h-5" />
+          </button>
+
+          {/* Circle Tool */}
+          <button
+            onClick={() => handleToolSelect('circle')}
+            className={`p-2 rounded-lg transition-all duration-200 ${
+              activeTool === 'circle' 
+                ? 'bg-blue-500 text-white shadow-md' 
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Circle (O)"
+          >
+            <Circle className="w-5 h-5" />
+          </button>
+
+          {/* Triangle Tool */}
+          <button
+            onClick={() => handleToolSelect('triangle')}
+            className={`p-2 rounded-lg transition-all duration-200 ${
+              activeTool === 'triangle' 
+                ? 'bg-blue-500 text-white shadow-md' 
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Triangle"
+          >
+            <Triangle className="w-5 h-5" />
+          </button>
+
+          {/* Line Tool */}
+          <button
+            onClick={() => handleToolSelect('line')}
+            className={`p-2 rounded-lg transition-all duration-200 ${
+              activeTool === 'line' 
+                ? 'bg-blue-500 text-white shadow-md' 
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Line (L)"
+          >
+            <Minus className="w-5 h-5" />
+          </button>
+
+          {/* Text Tool */}
+          <button
+            onClick={() => handleToolSelect('text')}
+            className={`p-2 rounded-lg transition-all duration-200 ${
+              activeTool === 'text' 
+                ? 'bg-blue-500 text-white shadow-md' 
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Text (T)"
+          >
+            <Type className="w-5 h-5" />
+          </button>
+
+          {/* Image Tool */}
+          <button
+            onClick={() => handleToolSelect('image')}
+            className={`p-2 rounded-lg transition-all duration-200 ${
+              activeTool === 'image' 
+                ? 'bg-blue-500 text-white shadow-md' 
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Image"
+          >
+            <Image className="w-5 h-5" />
+          </button>
+
+          {/* Pen Tool */}
+          <div className="w-px h-6 bg-gray-300 mx-2"></div>
+          
+          <button
+            className="p-2 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 transition-all duration-200"
+            title="Pen Tool (P)"
+          >
+            <PenTool className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Interactive Mode Shortcut Buttons */}
