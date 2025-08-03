@@ -4,7 +4,7 @@ import { useDesign, Component } from '../contexts/DesignContext'
 import { useNavigate } from 'react-router-dom'
 import { ProjectService } from '@/services/projectService'
 import { 
-  Move, 
+  Move,
   RotateCcw, 
   Trash2, 
   Eye, 
@@ -4661,8 +4661,8 @@ export function DesignMode({ projectId }: DesignModeProps) {
                       </div>
                         </div>
                         </div>
-        )}
-      </div>
+                    )}
+                        </div>
 
       {/* Figma-like Toolbar */}
       <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-2 z-50">
@@ -4767,7 +4767,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
           >
             <PenTool className="w-5 h-5" />
           </button>
-        </div>
+                        </div>
       </div>
 
       {/* Interactive Mode Shortcut Buttons */}

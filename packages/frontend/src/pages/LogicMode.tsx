@@ -70,8 +70,8 @@ export function LogicMode() {
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
-  const [sidebarVisible, setSidebarVisible] = useState(false)
-  const [leftSidebarVisible, setLeftSidebarVisible] = useState(false)
+  const [sidebarVisible, setSidebarVisible] = useState(true)
+  const [leftSidebarVisible, setLeftSidebarVisible] = useState(true)
 
   // Logic node types with better visual representation
   const nodeTypes = {
