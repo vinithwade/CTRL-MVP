@@ -197,11 +197,7 @@ export function LogicMode() {
   }
 
   const handleCanvasClick = (e: React.MouseEvent) => {
-    // Check if we clicked on the canvas background or empty areas
-    const target = e.target as HTMLElement
-    if (target === canvasRef.current || 
-        target.classList.contains('bg-gray-50') || 
-        target.tagName === 'DIV' && target.style.position === 'absolute') {
+    if (e.target === canvasRef.current) {
       setSelectedNode(null)
       setSidebarVisible(false)
       cancelConnection()

@@ -27,8 +27,7 @@ import {
   Image,
   MousePointer,
   PenTool,
-  Minus,
-  Plus
+  Minus
 } from 'lucide-react'
 
 interface Layer {
@@ -4023,7 +4022,13 @@ export function DesignMode({ projectId }: DesignModeProps) {
           }}
           onMouseDown={handleMouseDownPan}
           onMouseMove={handleMouseMovePan}
-          onMouseUp={handleMouseUpPan}
+          onMouseUp={() => {
+            if (activeTool === 'select') {
+              handleMouseUpPan()
+            } else {
+              handleCanvasMouseUp()
+            }
+          }}
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
