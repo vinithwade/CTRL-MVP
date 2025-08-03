@@ -70,7 +70,7 @@ export function LogicMode() {
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
-  const [sidebarVisible, setSidebarVisible] = useState(true)
+  const [sidebarVisible, setSidebarVisible] = useState(false)
   const [leftSidebarVisible, setLeftSidebarVisible] = useState(true)
 
   // Logic node types with better visual representation
@@ -954,67 +954,60 @@ export function LogicMode() {
       </div>
 
       {/* Right Sidebar - Overlay */}
-      {sidebarVisible && (
+      {sidebarVisible && selectedNode && (
         <div className="absolute top-0 right-0 h-full w-80 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 z-40 shadow-lg">
           <div className="flex-1 overflow-y-auto">
-            {selectedNode ? (
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-gray-900">Node Properties</h3>
-                  <button
-                    onClick={() => {
-                      setSelectedNode(null)
-                      setSidebarVisible(false)
-                    }}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900">Node Properties</h3>
+                <button
+                  onClick={() => {
+                    setSelectedNode(null)
+                    setSidebarVisible(false)
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
+                  <input
+                    type="text"
+                    value={selectedNode.name || ''}
+                    onChange={(e) => updateNode(selectedNode.id, { name: e.target.value })}
+                    className="w-full text-sm border border-gray-200 rounded px-2 py-1"
+                  />
                 </div>
                 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Name</label>
-                    <input
-                      type="text"
-                      value={selectedNode.name || ''}
-                      onChange={(e) => updateNode(selectedNode.id, { name: e.target.value })}
-                      className="w-full text-sm border border-gray-200 rounded px-2 py-1"
-                    />
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                  <div className="text-sm text-gray-900">
+                    {selectedNode.type === 'component' ? 'Component' : nodeTypes[selectedNode.type as keyof typeof nodeTypes]?.label || selectedNode.type}
                   </div>
-                  
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
-                    <div className="text-sm text-gray-900">
-                      {selectedNode.type === 'component' ? 'Component' : nodeTypes[selectedNode.type as keyof typeof nodeTypes]?.label || selectedNode.type}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Connections</label>
-                    <div className="text-sm text-gray-900">
-                      {selectedNode.connections.length} outgoing connections
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={() => {
-                      deleteNode(selectedNode.id)
-                      setSelectedNode(null)
-                      setSidebarVisible(false)
-                    }}
-                    className="w-full text-sm bg-red-600 text-white py-2 rounded hover:bg-red-700 transition-colors"
-                  >
-                    Delete Node
-                  </button>
                 </div>
+                
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Connections</label>
+                  <div className="text-sm text-gray-900">
+                    {selectedNode.connections.length} outgoing connections
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => {
+                    deleteNode(selectedNode.id)
+                    setSelectedNode(null)
+                    setSidebarVisible(false)
+                  }}
+                  className="w-full text-sm bg-red-600 text-white py-2 rounded hover:bg-red-700 transition-colors"
+                >
+                  Delete Node
+                </button>
               </div>
-            ) : (
-              <div className="p-4 text-center text-gray-500">
-                <GitBranch className="h-12 w-12 mx-auto mb-2 text-gray-300" />
-                <p className="text-sm">Select a node to edit its properties</p>
-              </div>
-            )}
+            </div>
           </div>
         </div>
       )}
