@@ -694,17 +694,6 @@ export function LogicMode() {
       <div className={`flex-1 relative overflow-hidden ${leftSidebarVisible ? '' : 'w-full'}`} ref={containerRef}>
         {/* Top Toolbar */}
         <div className="absolute top-4 left-4 z-50 flex items-center space-x-2">
-          {/* Toggle Left Sidebar Button */}
-          <button
-            onClick={() => setLeftSidebarVisible(!leftSidebarVisible)}
-            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
-            title={leftSidebarVisible ? "Hide Tools" : "Show Tools"}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
-          
           {/* Toggle Right Sidebar Button */}
           <button
             onClick={() => setSidebarVisible(!sidebarVisible)}
@@ -739,6 +728,25 @@ export function LogicMode() {
             ⌂
           </button>
         </div>
+
+        {/* Left Sidebar Toggle Button - Pill Style (when sidebar is closed) */}
+        {!leftSidebarVisible && (
+          <div className="absolute top-4 left-4 z-50">
+            <button
+              onClick={() => setLeftSidebarVisible(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-gray-800 text-white rounded-full shadow-lg hover:bg-gray-700 transition-colors"
+              title="Show Tools"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+              <span className="text-sm font-medium">Untitled</span>
+            </button>
+          </div>
+        )}
 
         {/* Zoom Level Indicator */}
         <div className="absolute top-4 right-4 bg-white border border-gray-300 rounded shadow-lg px-3 py-1 text-sm text-gray-600 z-50">
