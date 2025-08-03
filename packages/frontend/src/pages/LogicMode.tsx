@@ -197,7 +197,11 @@ export function LogicMode() {
   }
 
   const handleCanvasClick = (e: React.MouseEvent) => {
-    if (e.target === canvasRef.current) {
+    // Check if we clicked on the canvas background or empty areas
+    const target = e.target as HTMLElement
+    if (target === canvasRef.current || 
+        target.classList.contains('bg-gray-50') || 
+        target.tagName === 'DIV' && target.style.position === 'absolute') {
       setSelectedNode(null)
       setSidebarVisible(false)
       cancelConnection()
@@ -757,7 +761,6 @@ export function LogicMode() {
             transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${pan.y / zoom}px)`,
             transformOrigin: '0 0'
           }}
-          onClick={handleCanvasClick}
           onMouseMove={handleMouseMove}
           onMouseUp={() => setIsDragging(false)}
           onDragOver={(e) => e.preventDefault()}
@@ -790,6 +793,14 @@ export function LogicMode() {
             style={{ 
               width: '100%', 
               height: '100%'
+            }}
+            onClick={(e) => {
+              // Only handle clicks on the background itself, not on nodes
+              if (e.target === e.currentTarget) {
+                setSelectedNode(null)
+                setSidebarVisible(false)
+                cancelConnection()
+              }
             }}
             onMouseDown={(e) => {
               if (e.button === 1 || (e.button === 0 && e.altKey)) {
