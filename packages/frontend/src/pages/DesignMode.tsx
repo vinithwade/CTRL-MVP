@@ -76,7 +76,6 @@ export function DesignMode({ projectId }: DesignModeProps) {
   const [isLoadingData, setIsLoadingData] = useState(false) // Add loading state to prevent save during load
   const [hasLoadedData, setHasLoadedData] = useState(false) // Track if data has been loaded
   const [isSaving, setIsSaving] = useState(false) // Add saving state indicator
-  const [saveTimeout, setSaveTimeout] = useState<NodeJS.Timeout | null>(null) // Add debounce timeout
   const [savedIndicator, setSavedIndicator] = useState(false) // Add saved indicator
   const [selectedComponent, setSelectedComponent] = useState<Component | null>(null)
   const [isDragging, setIsDragging] = useState(false)
