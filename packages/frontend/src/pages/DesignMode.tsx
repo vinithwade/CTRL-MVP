@@ -2881,7 +2881,6 @@ export function DesignMode({ projectId }: DesignModeProps) {
     }
   }, [isDragging, isResizing, isPanning, draggedScreen, screenDragOffset, pan, zoom, selectedComponent, activeScreen, screens, screenPositions])
 
-  const MIN_HEIGHT = 20;
 
   // Helper function to automatically position new screens beside the current active screen
   const [isCreatingScreen, setIsCreatingScreen] = useState(false)
