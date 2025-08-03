@@ -704,32 +704,9 @@ export function LogicMode() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
             </svg>
           </button>
-          
-          {/* Zoom Controls */}
-          <button
-            onClick={zoomIn}
-            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
-            title="Zoom In"
-          >
-            +
-          </button>
-          <button
-            onClick={zoomOut}
-            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
-            title="Zoom Out"
-          >
-            −
-          </button>
-          <button
-            onClick={resetView}
-            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50 text-xs"
-            title="Reset View"
-          >
-            ⌂
-          </button>
         </div>
 
-        {/* Left Sidebar Toggle Button - Pill Style (when sidebar is closed) */}
+        {/* Right Sidebar Toggle Button - Pill Style (when sidebar is closed) */}
         {!leftSidebarVisible && (
           <div className="absolute top-4 left-4 z-50">
             <button
@@ -748,9 +725,32 @@ export function LogicMode() {
           </div>
         )}
 
-        {/* Zoom Level Indicator */}
-        <div className="absolute top-4 right-4 bg-white border border-gray-300 rounded shadow-lg px-3 py-1 text-sm text-gray-600 z-50">
-          {Math.round(zoom * 100)}%
+        {/* Zoom Controls and Level Indicator - Top Right */}
+        <div className="absolute top-4 right-4 z-50 flex items-center space-x-2">
+          <button
+            onClick={zoomOut}
+            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
+            title="Zoom Out"
+          >
+            −
+          </button>
+          <div className="bg-white border border-gray-300 rounded shadow-lg px-3 py-1 text-sm text-gray-600">
+            {Math.round(zoom * 100)}%
+          </div>
+          <button
+            onClick={zoomIn}
+            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
+            title="Zoom In"
+          >
+            +
+          </button>
+          <button
+            onClick={resetView}
+            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50 text-xs"
+            title="Reset View"
+          >
+            ⌂
+          </button>
         </div>
 
         {/* Connection Status */}
