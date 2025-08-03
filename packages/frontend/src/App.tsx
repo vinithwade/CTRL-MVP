@@ -12,6 +12,7 @@ import { DesignProvider } from '@/contexts/DesignContext'
 import { UserDashboardPage } from '@/pages/UserDashboardPage'
 import { ProfilePage } from '@/pages/ProfilePage'
 import { Analytics } from '@vercel/analytics/react'
+import { SpeedInsights } from '@vercel/speed-insights/react'
 
 function DesignModeWithProject() {
   const { projectId } = useParams()
@@ -82,6 +83,7 @@ function App() {
       <DesignProvider>
         <AppContent />
         <Analytics />
+        <SpeedInsights />
       </DesignProvider>
     </NavigationProvider>
   )
