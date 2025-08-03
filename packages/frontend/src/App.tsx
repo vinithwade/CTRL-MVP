@@ -11,6 +11,7 @@ import { NavigationProvider } from '@/contexts/NavigationContext'
 import { DesignProvider } from '@/contexts/DesignContext'
 import { UserDashboardPage } from '@/pages/UserDashboardPage'
 import { ProfilePage } from '@/pages/ProfilePage'
+import { Analytics } from '@vercel/analytics/react'
 
 function DesignModeWithProject() {
   const { projectId } = useParams()
@@ -80,6 +81,7 @@ function App() {
     <NavigationProvider>
       <DesignProvider>
         <AppContent />
+        <Analytics />
       </DesignProvider>
     </NavigationProvider>
   )
