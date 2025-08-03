@@ -1,0 +1,35 @@
+# Ignore backend and shared packages for frontend deployment
+packages/backend/
+packages/shared/
+
+# Ignore Docker files
+Dockerfile
+Dockerfile.dev
+docker-compose.yml
+docker/
+
+# Ignore database files
+*.sql
+setup-database.sh
+
+# Ignore deployment scripts
+deploy.sh
+
+# Ignore environment files
+.env
+.env.example
+
+# Ignore documentation
+README.md
+DATABASE_SETUP.md
+TROUBLESHOOTING.md
+
+# Ignore images (not needed for frontend)
+image/
+
+# Ignore git
+.git/
+
+# Ignore node_modules (will be installed by Vercel)
+node_modules/
+packages/*/node_modules/ 
