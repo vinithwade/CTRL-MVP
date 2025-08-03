@@ -12,6 +12,26 @@ export function HomePage() {
   const [isFeaturesVisible, setIsFeaturesVisible] = useState(false)
   const featuresRef = useRef<HTMLDivElement>(null)
 
+  // Add custom CSS for shining animation
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.textContent = `
+      @keyframes shine {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+      }
+      .animate-shine {
+        animation: shine 2s ease-in-out infinite;
+      }
+    `
+    document.head.appendChild(style)
+    return () => {
+      if (document.head.contains(style)) {
+        document.head.removeChild(style)
+      }
+    }
+  }, [])
+
   const handleDevelopersClick = () => {
     if (isLoggedIn) {
       navigate('/user-dashboard')
@@ -57,7 +77,13 @@ export function HomePage() {
             
             {/* Main Heading */}
             <h1 className="text-5xl md:text-7xl font-semibold text-white mb-6 leading-tight font-['Inter']">
-              CTRL: One Flow. No Handoffs.
+              One Flow. No Handoffs.
+              <span className="block mt-4 relative">
+                <span className="relative inline-block bg-gradient-to-r from-blue-400 via-purple-400 to-blue-400 bg-clip-text text-transparent animate-pulse">
+                  CTRL
+                </span>
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shine"></div>
+              </span>
             </h1>
             
             {/* Subtitle */}
