@@ -2302,30 +2302,15 @@ export function DesignMode({ projectId }: DesignModeProps) {
     setResizeHandle(handle)
     setIsResizing(true)
     
-    // Get the canvas container that has the zoom and pan transformations
-    const canvasContainer = document.querySelector('.absolute.inset-0') as HTMLElement
-    if (canvasContainer) {
-      const canvasRect = canvasContainer.getBoundingClientRect()
+    const activeScreenElement = document.querySelector(`[data-screen-id="${activeScreen}"]`) as HTMLElement
+    if (activeScreenElement) {
+      const screenRect = activeScreenElement.getBoundingClientRect()
       
-      // Calculate the mouse position relative to the canvas, accounting for zoom and pan
-      const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
-      const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
+      // Calculate mouse position relative to the screen element
+      const mouseX = e.clientX - screenRect.left
+      const mouseY = e.clientY - screenRect.top
       
-      // Calculate the screen's position within the canvas
-      const currentScreen = screens.find(s => s.id === activeScreen)
-      const screenIndex = screens.findIndex(s => s.id === activeScreen)
-      const screenPosition = screenPositions[activeScreen!] || { x: 0, y: 0 }
-      
-      // Calculate grid position using the helper function
-      const { defaultX, defaultY } = calculateScreenPosition(screenIndex, currentScreen!)
-      const screenLeft = defaultX + screenPosition.x
-      const screenTop = defaultY + screenPosition.y
-      
-      // Calculate mouse position relative to the screen
-      const startX = mouseX - screenLeft
-      const startY = mouseY - screenTop
-      
-      setResizeStartPos({ x: startX, y: startY })
+      setResizeStartPos({ x: mouseX, y: mouseY })
       setResizeStartSize({ width: component.size.width, height: component.size.height })
     }
   }
@@ -2334,94 +2319,74 @@ export function DesignMode({ projectId }: DesignModeProps) {
     if (isResizing && selectedComponent && resizeHandle) {
       const activeScreenElement = document.querySelector(`[data-screen-id="${activeScreen}"]`) as HTMLElement
       if (activeScreenElement) {
-        const screenContentElement = activeScreenElement.querySelector('.relative.w-full.h-full') as HTMLElement
-        if (screenContentElement) {
-          // Get the canvas container that has the zoom and pan transformations
-          const canvasContainer = document.querySelector('.absolute.inset-0') as HTMLElement
-          if (canvasContainer) {
-            const canvasRect = canvasContainer.getBoundingClientRect()
-            
-            // Calculate the mouse position relative to the canvas, accounting for zoom and pan
-            const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
-            const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
-            
-            // Calculate the screen's position within the canvas
-            const currentScreen = screens.find(s => s.id === activeScreen)
-            const screenIndex = screens.findIndex(s => s.id === activeScreen)
-            const screenPosition = screenPositions[activeScreen!] || { x: 0, y: 0 }
-            
-            // Calculate grid position using the helper function
-            const { defaultX, defaultY } = calculateScreenPosition(screenIndex, currentScreen!)
-            const screenLeft = defaultX + screenPosition.x
-            const screenTop = defaultY + screenPosition.y
-            
-            // Calculate current mouse position relative to the screen
-            const currentX = mouseX - screenLeft
-            const currentY = mouseY - screenTop
-            
-            
-            const deltaX = currentX - resizeStartPos.x
-            const deltaY = currentY - resizeStartPos.y
-            
-            let newWidth = resizeStartSize.width
-            let newHeight = resizeStartSize.height
-            let newX = selectedComponent.position.x
-            let newY = selectedComponent.position.y
-            
-            // Calculate new size and position based on resize handle
-            switch (resizeHandle) {
-              case 'se': // bottom-right
-                newWidth = Math.max(20, resizeStartSize.width + deltaX)
-                newHeight = Math.max(20, resizeStartSize.height + deltaY)
-                break
-              case 'sw': // bottom-left
-                newWidth = Math.max(20, resizeStartSize.width - deltaX)
-                newHeight = Math.max(20, resizeStartSize.height + deltaY)
-                newX = resizeStartPos.x + resizeStartSize.width - newWidth
-                break
-              case 'ne': // top-right
-                newWidth = Math.max(20, resizeStartSize.width + deltaX)
-                newHeight = Math.max(20, resizeStartSize.height - deltaY)
-                newY = resizeStartPos.y + resizeStartSize.height - newHeight
-                break
-              case 'nw': // top-left
-                newWidth = Math.max(20, resizeStartSize.width - deltaX)
-                newHeight = Math.max(20, resizeStartSize.height - deltaY)
-                newX = resizeStartPos.x + resizeStartSize.width - newWidth
-                newY = resizeStartPos.y + resizeStartSize.height - newHeight
-                break
-              case 'e': // right
-                newWidth = Math.max(20, resizeStartSize.width + deltaX)
-                break
-              case 'w': // left
-                newWidth = Math.max(20, resizeStartSize.width - deltaX)
-                newX = resizeStartPos.x + resizeStartSize.width - newWidth
-                break
-              case 's': // bottom
-                newHeight = Math.max(20, resizeStartSize.height + deltaY)
-                break
-              case 'n': // top
-                newHeight = Math.max(20, resizeStartSize.height - deltaY)
-                newY = resizeStartPos.y + resizeStartSize.height - newHeight
-                break
-            }
-            
-            // Constrain to screen bounds (allow resizing all the way to the edge)
-            if (currentScreen) {
-              // Clamp width/height so the component doesn't go outside the screen
-              newWidth = Math.min(newWidth, currentScreen.width - newX);
-              newHeight = Math.min(newHeight, currentScreen.height - newY);
-              // Clamp position so the component doesn't go outside the screen
-              newX = Math.max(0, Math.min(newX, currentScreen.width - newWidth));
-              newY = Math.max(0, Math.min(newY, currentScreen.height - newHeight));
-            }
-            
-            updateComponentLocal(selectedComponent.id, {
-              position: { x: newX, y: newY },
-              size: { width: newWidth, height: newHeight }
-            })
-          }
+        const screenRect = activeScreenElement.getBoundingClientRect()
+        
+        // Calculate mouse position relative to the screen element
+        const mouseX = e.clientX - screenRect.left
+        const mouseY = e.clientY - screenRect.top
+        
+        // Calculate deltas from the resize start position
+        const deltaX = mouseX - resizeStartPos.x
+        const deltaY = mouseY - resizeStartPos.y
+        
+        let newWidth = resizeStartSize.width
+        let newHeight = resizeStartSize.height
+        let newX = selectedComponent.position.x
+        let newY = selectedComponent.position.y
+        
+        // Calculate new size and position based on resize handle
+        switch (resizeHandle) {
+          case 'se': // bottom-right
+            newWidth = Math.max(20, resizeStartSize.width + deltaX)
+            newHeight = Math.max(20, resizeStartSize.height + deltaY)
+            break
+          case 'sw': // bottom-left
+            newWidth = Math.max(20, resizeStartSize.width - deltaX)
+            newHeight = Math.max(20, resizeStartSize.height + deltaY)
+            newX = selectedComponent.position.x + resizeStartSize.width - newWidth
+            break
+          case 'ne': // top-right
+            newWidth = Math.max(20, resizeStartSize.width + deltaX)
+            newHeight = Math.max(20, resizeStartSize.height - deltaY)
+            newY = selectedComponent.position.y + resizeStartSize.height - newHeight
+            break
+          case 'nw': // top-left
+            newWidth = Math.max(20, resizeStartSize.width - deltaX)
+            newHeight = Math.max(20, resizeStartSize.height - deltaY)
+            newX = selectedComponent.position.x + resizeStartSize.width - newWidth
+            newY = selectedComponent.position.y + resizeStartSize.height - newHeight
+            break
+          case 'e': // right
+            newWidth = Math.max(20, resizeStartSize.width + deltaX)
+            break
+          case 'w': // left
+            newWidth = Math.max(20, resizeStartSize.width - deltaX)
+            newX = selectedComponent.position.x + resizeStartSize.width - newWidth
+            break
+          case 's': // bottom
+            newHeight = Math.max(20, resizeStartSize.height + deltaY)
+            break
+          case 'n': // top
+            newHeight = Math.max(20, resizeStartSize.height - deltaY)
+            newY = selectedComponent.position.y + resizeStartSize.height - newHeight
+            break
         }
+        
+        // Constrain to screen bounds
+        const currentScreen = screens.find(s => s.id === activeScreen)
+        if (currentScreen) {
+          // Clamp width/height so the component doesn't go outside the screen
+          newWidth = Math.min(newWidth, currentScreen.width - newX)
+          newHeight = Math.min(newHeight, currentScreen.height - newY)
+          // Clamp position so the component doesn't go outside the screen
+          newX = Math.max(0, Math.min(newX, currentScreen.width - newWidth))
+          newY = Math.max(0, Math.min(newY, currentScreen.height - newHeight))
+        }
+        
+        updateComponentLocal(selectedComponent.id, {
+          position: { x: newX, y: newY },
+          size: { width: newWidth, height: newHeight }
+        })
       }
     }
   }
