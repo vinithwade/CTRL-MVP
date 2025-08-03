@@ -711,7 +711,7 @@ export function LogicMode() {
           <div className="absolute top-4 left-4 z-50">
             <button
               onClick={() => setLeftSidebarVisible(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-gray-800 text-white rounded-full shadow-lg hover:bg-gray-700 transition-colors"
+              className="flex items-center space-x-2 px-4 py-2 bg-white text-gray-700 rounded-lg shadow-lg hover:bg-gray-50 transition-colors border border-gray-200"
               title="Show Tools"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -720,7 +720,7 @@ export function LogicMode() {
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
-              <span className="text-sm font-medium">Untitled</span>
+              <span className="text-sm font-medium">Logic Tools</span>
             </button>
           </div>
         )}
