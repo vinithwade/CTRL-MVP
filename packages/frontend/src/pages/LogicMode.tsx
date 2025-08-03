@@ -848,18 +848,6 @@ export function LogicMode() {
 
           {/* Nodes */}
           {logicNodes.map(renderNode)}
-
-          {/* Empty State */}
-          {logicNodes.length === 0 && (
-            <div className="absolute inset-8 flex items-center justify-center">
-              <div className="text-center text-gray-500 bg-white/80 backdrop-blur-sm rounded-lg p-8 border border-gray-200 shadow-sm">
-                <GitBranch className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                <h3 className="text-lg font-medium mb-2">No Workflow</h3>
-                <p className="text-sm">Drag components and logic nodes from the sidebar to create a workflow</p>
-                <p className="text-xs mt-2">Click connection points to create flows between nodes</p>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Connections - Rendered outside transformed container */}
