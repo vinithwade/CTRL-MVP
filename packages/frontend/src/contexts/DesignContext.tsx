@@ -95,6 +95,7 @@ interface DesignContextType {
   components: Component[]
   logicNodes: LogicNode[]
   connections: Connection[]
+  screenPositions: {[key: string]: {x: number, y: number}}
   addComponent: (component: Component) => void
   updateComponent: (componentId: string, updates: Partial<Component>) => void
   deleteComponent: (componentId: string) => void
@@ -102,6 +103,8 @@ interface DesignContextType {
   updateScreen: (screenId: string, updates: Partial<Screen>) => void
   deleteScreen: (screenId: string) => void
   setActiveScreen: (screenId: string) => void
+  setScreenPositions: (positions: {[key: string]: {x: number, y: number}}) => void
+  updateScreenPosition: (screenId: string, position: {x: number, y: number}) => void
   addLogicToComponent: (componentId: string, logic: Component['logic']) => void
   getComponentById: (componentId: string) => Component | undefined
   getComponentsByScreen: (screenId: string) => Component[]
@@ -121,6 +124,7 @@ export function DesignProvider({ children }: { children: ReactNode }) {
   const [components, setComponents] = useState<Component[]>([])
   const [logicNodes, setLogicNodes] = useState<LogicNode[]>([])
   const [connections, setConnections] = useState<Connection[]>([])
+  const [screenPositions, setScreenPositions] = useState<{[key: string]: {x: number, y: number}}>({})
 
   const addComponent = (component: Component) => {
     setComponents(prev => [...prev, component])
@@ -200,6 +204,13 @@ export function DesignProvider({ children }: { children: ReactNode }) {
     setConnections([])
   }
 
+  const updateScreenPosition = (screenId: string, position: {x: number, y: number}) => {
+    setScreenPositions(prev => ({
+      ...prev,
+      [screenId]: position
+    }))
+  }
+
   return (
     <DesignContext.Provider value={{
       screens,
@@ -207,6 +218,7 @@ export function DesignProvider({ children }: { children: ReactNode }) {
       components,
       logicNodes,
       connections,
+      screenPositions,
       addComponent,
       updateComponent,
       deleteComponent,
@@ -214,6 +226,8 @@ export function DesignProvider({ children }: { children: ReactNode }) {
       updateScreen,
       deleteScreen,
       setActiveScreen,
+      setScreenPositions,
+      updateScreenPosition,
       addLogicToComponent,
       getComponentById,
       getComponentsByScreen,

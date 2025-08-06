@@ -73,7 +73,10 @@ export function DesignMode({ projectId }: DesignModeProps) {
     setActiveScreen,
     addComponent,
     updateComponent,
-    deleteComponent
+    deleteComponent,
+    screenPositions,
+    setScreenPositions,
+    updateScreenPosition
   } = useDesign()
   
   // Add state for project information
@@ -118,7 +121,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
   const [sidebarVisible, setSidebarVisible] = useState(true)
   
   // Screen positions for dragging
-  const [screenPositions, setScreenPositions] = useState<{[key: string]: {x: number, y: number}}>({})
+
   const [draggedScreen, setDraggedScreen] = useState<string | null>(null)
   const [screenDragOffset, setScreenDragOffset] = useState({ x: 0, y: 0 })
 
@@ -1012,18 +1015,15 @@ export function DesignMode({ projectId }: DesignModeProps) {
           const relativeY = newY - defaultY
           
           // Add some smoothing to prevent jumping
-          setScreenPositions(prev => {
-            const currentPos = prev[draggedScreen] || { x: 0, y: 0 }
-            const smoothFactor = 0.8 // Adjust this for more or less smoothing
-            
-            return {
-            ...prev,
-              [draggedScreen]: { 
-                x: currentPos.x * smoothFactor + relativeX * (1 - smoothFactor),
-                y: currentPos.y * smoothFactor + relativeY * (1 - smoothFactor)
-              }
-            }
-          })
+          const currentPos = screenPositions[draggedScreen] || { x: 0, y: 0 }
+          const smoothFactor = 0.8 // Adjust this for more or less smoothing
+          
+          const newPosition = {
+            x: currentPos.x * smoothFactor + relativeX * (1 - smoothFactor),
+            y: currentPos.y * smoothFactor + relativeY * (1 - smoothFactor)
+          }
+          
+          updateScreenPosition(draggedScreen, newPosition)
         }
         
         document.body.style.cursor = 'grabbing'
@@ -2913,10 +2913,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
     }
     
     // Set initial position for the new screen
-      setScreenPositions(prev => ({
-        ...prev,
-      [newScreen.id]: newPosition
-    }))
+      updateScreenPosition(newScreen.id, newPosition)
     
     // Center the view on the new screen to ensure it's visible
     setTimeout(() => {
