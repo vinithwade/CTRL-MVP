@@ -71,9 +71,9 @@ export function DesignMode({ projectId }: DesignModeProps) {
     deleteScreen, 
     activeScreen, 
     setActiveScreen,
-    addComponent,
-    updateComponent,
-    deleteComponent,
+    addComponent, 
+    updateComponent, 
+    deleteComponent, 
     screenPositions,
     setScreenPositions,
     updateScreenPosition
@@ -105,6 +105,11 @@ export function DesignMode({ projectId }: DesignModeProps) {
   const [activeTab, setActiveTab] = useState<'file' | 'assets'>('file')
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
+  
+  // Reset pan to center
+  const resetPan = () => {
+    setPan({ x: 0, y: 0 })
+  }
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
 
@@ -405,6 +410,8 @@ export function DesignMode({ projectId }: DesignModeProps) {
       // Force load after a short delay to ensure context is ready
       setTimeout(() => {
       loadProjectData()
+      // Reset pan to center after loading
+      resetPan()
       }, 100)
       
       return () => clearTimeout(loadTimeout)
@@ -939,6 +946,10 @@ export function DesignMode({ projectId }: DesignModeProps) {
         e.preventDefault()
         setSelectedComponent(null)
             break
+          case 'Home':
+          e.preventDefault()
+        resetPan()
+            break
         }
       }
     }
@@ -947,24 +958,47 @@ export function DesignMode({ projectId }: DesignModeProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectedComponent, selectedComponentData, manualSave])
 
-  // Wheel event for zoom and pan (Figma-like)
+  // Fast responsive zoom and pan
   useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault()
       e.stopPropagation()
       
-      // Zoom with Ctrl/Cmd + scroll
+      // Get mouse position relative to canvas
+      const canvasContainer = containerRef.current
+      if (!canvasContainer) return
+      
+      const canvasRect = canvasContainer.getBoundingClientRect()
+      const mouseX = e.clientX - canvasRect.left
+      const mouseY = e.clientY - canvasRect.top
+      
+      // Zoom only with Ctrl/Cmd + scroll (explicit zoom gesture)
       if (e.ctrlKey || e.metaKey) {
-        const delta = e.deltaY > 0 ? 0.9 : 1.1
-        setZoom(prev => {
-          const newZoom = prev * delta
-          return Math.max(0.1, Math.min(5, newZoom))
+        // More responsive zoom factor
+        const zoomFactor = e.deltaY > 0 ? 0.85 : 1.15
+        const newZoom = Math.max(0.1, Math.min(5, zoom * zoomFactor))
+        
+        // Calculate zoom center point
+        const zoomCenterX = (mouseX - pan.x) / zoom
+        const zoomCenterY = (mouseY - pan.y) / zoom
+        
+        // Calculate new pan to keep zoom center fixed
+        const newPanX = mouseX - zoomCenterX * newZoom
+        const newPanY = mouseY - zoomCenterY * newZoom
+        
+        // Immediate update for responsiveness
+        setZoom(newZoom)
+        setPan({
+          x: newPanX,
+          y: newPanY
         })
+        
       } else {
-        // Trackpad panning (two-finger scroll)
+        // Fast trackpad panning (two-finger scroll) - always pan, never zoom
+        const panSpeed = 1.5 // Increased for faster movement
         setPan(prev => ({
-          x: prev.x - e.deltaX,
-          y: prev.y - e.deltaY
+          x: prev.x - e.deltaX * panSpeed,
+          y: prev.y - e.deltaY * panSpeed
         }))
       }
     }
@@ -974,7 +1008,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
       container.addEventListener('wheel', handleWheel, { passive: false })
       return () => container.removeEventListener('wheel', handleWheel)
     }
-  }, [])
+  }, [zoom, pan])
 
   // Global mouse move for panning
   useEffect(() => {
@@ -1268,22 +1302,25 @@ export function DesignMode({ projectId }: DesignModeProps) {
     e.stopPropagation()
     setSelectedComponent(component)
     
-    // Get the canvas container that has the zoom and pan transformations
-    const canvasContainer = document.querySelector('.absolute.inset-0') as HTMLElement
-    if (canvasContainer) {
+    // Get the canvas container (same as handleMouseMove)
+    const canvasContainer = containerRef.current
+    if (!canvasContainer) return
+    
       const canvasRect = canvasContainer.getBoundingClientRect()
       
-      // Calculate the mouse position relative to the canvas, accounting for zoom
-      const mouseX = (e.clientX - canvasRect.left) / zoom
-      const mouseY = (e.clientY - canvasRect.top) / zoom
+      // Calculate the mouse position relative to the canvas, accounting for zoom and pan
+      const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
+      const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
       
-      // Calculate the screen's position within the canvas
+    // Get the active screen
       const currentScreen = screens.find(s => s.id === activeScreen)
+    if (!currentScreen) return
+    
       const screenIndex = screens.findIndex(s => s.id === activeScreen)
       const screenPosition = screenPositions[activeScreen!] || { x: 0, y: 0 }
       
-      // Calculate grid position using the helper function
-      const { defaultX, defaultY } = calculateScreenPosition(screenIndex, currentScreen!)
+    // Calculate screen position in canvas coordinates
+    const { defaultX, defaultY } = calculateScreenPosition(screenIndex, currentScreen)
       const screenLeft = defaultX + screenPosition.x
       const screenTop = defaultY + screenPosition.y
       
@@ -1312,53 +1349,48 @@ export function DesignMode({ projectId }: DesignModeProps) {
         document.removeEventListener('mouseup', handleMouseUpEarly)
       }
       document.addEventListener('mouseup', handleMouseUpEarly, { once: true })
-    }
   }
 
   const handleMouseMove = (e: MouseEvent) => {
     if (isDragging && selectedComponent && selectedComponentData) {
       console.log('Mouse move while dragging')
       
-      const activeScreenElement = document.querySelector(`[data-screen-id="${activeScreen}"]`) as HTMLElement
-      if (activeScreenElement) {
-        const screenContentElement = activeScreenElement.querySelector('.relative.w-full.h-full') as HTMLElement
-        if (screenContentElement) {
-          // Get the canvas container that has the zoom and pan transformations
-          const canvasContainer = document.querySelector('.absolute.inset-0') as HTMLElement
-          if (canvasContainer) {
+      // Get the canvas container
+      const canvasContainer = containerRef.current
+      if (!canvasContainer) return
+      
             const canvasRect = canvasContainer.getBoundingClientRect()
-            // const screenRect = screenContentElement.getBoundingClientRect()
             
-            // Calculate the mouse position relative to the screen content, accounting for zoom and pan
+      // Calculate mouse position relative to canvas, accounting for zoom and pan
             const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
             const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
             
-            // Calculate the screen's position within the canvas
+      // Get the active screen
             const currentScreen = screens.find(s => s.id === activeScreen)
+      if (!currentScreen) return
+      
             const screenIndex = screens.findIndex(s => s.id === activeScreen)
             const screenPosition = screenPositions[activeScreen!] || { x: 0, y: 0 }
             
-            // Calculate grid position using the helper function
-            const { defaultX, defaultY } = calculateScreenPosition(screenIndex, currentScreen!)
+      // Calculate screen position in canvas coordinates
+      const { defaultX, defaultY } = calculateScreenPosition(screenIndex, currentScreen)
             const screenLeft = defaultX + screenPosition.x
             const screenTop = defaultY + screenPosition.y
             
-            // Calculate new component position relative to the screen
+      // Calculate new component position relative to screen
             const newX = mouseX - screenLeft - dragOffset.x
             const newY = mouseY - screenTop - dragOffset.y
             
             // Constrain to screen bounds
-            const constrainedX = Math.max(0, Math.min(newX, (currentScreen?.width || 400) - selectedComponent.size.width))
-            const constrainedY = Math.max(0, Math.min(newY, (currentScreen?.height || 600) - selectedComponent.size.height))
+      const constrainedX = Math.max(0, Math.min(newX, currentScreen.width - selectedComponent.size.width))
+      const constrainedY = Math.max(0, Math.min(newY, currentScreen.height - selectedComponent.size.height))
             
             console.log('Dragging component to:', { x: constrainedX, y: constrainedY })
             
+      // Update component position immediately
             updateComponentLocal(selectedComponent.id, {
               position: { x: constrainedX, y: constrainedY }
             })
-          }
-        }
-      }
     }
   }
 
@@ -1406,25 +1438,42 @@ export function DesignMode({ projectId }: DesignModeProps) {
     }
   }
 
-  // Pan functionality (disabled - no-op functions)
+  // Fast mouse panning functionality
   const handleMouseDownPan = (e: React.MouseEvent) => {
-    // Panning disabled
+    e.preventDefault()
+    setIsPanning(true)
+      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y })
+    document.body.style.cursor = 'grabbing'
   }
 
   const handleMouseMovePan = (e: React.MouseEvent) => {
-    // Panning disabled
+    if (isPanning) {
+    e.preventDefault()
+      const newPanX = e.clientX - panStart.x
+      const newPanY = e.clientY - panStart.y
+      setPan({
+        x: newPanX,
+        y: newPanY
+      })
+    }
   }
 
   const handleMouseUpPan = () => {
-    // Panning disabled
+    setIsPanning(false)
+    document.body.style.cursor = 'default'
   }
 
   const handleMouseEnter = () => {
-    // Panning disabled
+    if (isPanning) {
+      document.body.style.cursor = 'grabbing'
+    }
   }
 
   const handleMouseLeave = () => {
-    // Panning disabled
+    if (isPanning) {
+      setIsPanning(false)
+      document.body.style.cursor = 'default'
+    }
   }
 
 
@@ -1892,174 +1941,116 @@ export function DesignMode({ projectId }: DesignModeProps) {
     if (!currentScreen) return
 
     const profileComponents: Component[] = [
+      // Header background
       {
-        id: Date.now().toString() + '_profile_header',
-        type: 'text',
-        name: 'Profile',
+        id: Date.now().toString() + '_profile_header_bg',
+        type: 'container',
+        name: 'HeaderBG',
         props: {},
-        position: { x: 30, y: 60 },
-        size: { width: 200, height: 40 },
-        backgroundColor: '#ffffff'
+        position: { x: 0, y: 0 },
+        size: { width: 400, height: 120 },
+        backgroundColor: '#2563eb',
       },
-      {
-        id: Date.now().toString() + '_back_button',
-        type: 'button',
-        name: '← Back',
-        props: {},
-        position: { x: 320, y: 60 },
-        size: { width: 60, height: 40 },
-        backgroundColor: '#f3f4f6',
-        interactions: {
-          click: 'navigate_back',
-          hover: 'highlight'
-        }
-      },
+      // Profile photo (centered, overlapping header)
       {
         id: Date.now().toString() + '_profile_photo',
         type: 'image',
         name: 'Profile Photo',
         props: {},
-        position: { x: 150, y: 120 },
+        position: { x: 140, y: 60 },
         size: { width: 120, height: 120 },
         backgroundColor: '#e5e7eb',
         interactions: {
           click: 'change_profile_photo',
-          hover: 'scale'
+          hover: 'scale',
         },
         dataBinding: {
-          variable: 'profilePhoto'
-        }
+          variable: 'profilePhoto',
       },
+      },
+      // Edit Photo button (below photo)
       {
         id: Date.now().toString() + '_edit_photo',
         type: 'button',
         name: 'Edit Photo',
         props: {},
-        position: { x: 150, y: 260 },
-        size: { width: 120, height: 30 },
+        position: { x: 160, y: 190 },
+        size: { width: 80, height: 32 },
         backgroundColor: '#3b82f6',
         interactions: {
           click: 'open_photo_picker',
-          hover: 'scale'
-        }
+          hover: 'scale',
       },
+      },
+      // Name label
       {
         id: Date.now().toString() + '_name_label',
         type: 'text',
         name: 'Full Name',
         props: {},
-        position: { x: 30, y: 320 },
+        position: { x: 40, y: 240 },
         size: { width: 100, height: 20 },
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
       },
+      // Name input
       {
         id: Date.now().toString() + '_name_input',
         type: 'input',
-        name: 'Name Input',
-        props: {},
-        position: { x: 30, y: 350 },
-        size: { width: 350, height: 50 },
-        backgroundColor: '#f8f9fa',
-        interactions: {
-          click: 'focus',
-          hover: 'highlight'
-        },
+        name: 'NameInput',
+        props: { placeholder: 'Enter your name' },
+        position: { x: 160, y: 235 },
+        size: { width: 200, height: 32 },
+        backgroundColor: '#f3f4f6',
         dataBinding: {
-          variable: 'userName'
-        }
+          variable: 'fullName',
       },
+      },
+      // Email label
       {
         id: Date.now().toString() + '_email_label',
         type: 'text',
         name: 'Email',
         props: {},
-        position: { x: 30, y: 420 },
+        position: { x: 40, y: 280 },
         size: { width: 100, height: 20 },
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
       },
+      // Email input
       {
         id: Date.now().toString() + '_email_input',
         type: 'input',
-        name: 'Email Input',
-        props: {},
-        position: { x: 30, y: 450 },
-        size: { width: 350, height: 50 },
-        backgroundColor: '#f8f9fa',
-        interactions: {
-          click: 'focus',
-          hover: 'highlight'
-        },
+        name: 'EmailInput',
+        props: { placeholder: 'Enter your email' },
+        position: { x: 160, y: 275 },
+        size: { width: 200, height: 32 },
+        backgroundColor: '#f3f4f6',
         dataBinding: {
-          variable: 'userEmail'
-        }
-      },
-      {
-        id: Date.now().toString() + '_phone_label',
-        type: 'text',
-        name: 'Phone',
-        props: {},
-        position: { x: 30, y: 520 },
-        size: { width: 100, height: 20 },
-        backgroundColor: '#ffffff'
-      },
-      {
-        id: Date.now().toString() + '_phone_input',
-        type: 'input',
-        name: 'Phone Input',
-        props: {},
-        position: { x: 30, y: 550 },
-        size: { width: 350, height: 50 },
-        backgroundColor: '#f8f9fa',
-        interactions: {
-          click: 'focus',
-          hover: 'highlight'
+          variable: 'email',
         },
-        dataBinding: {
-          variable: 'userPhone'
-        }
       },
+      // Save button
       {
         id: Date.now().toString() + '_save_button',
         type: 'button',
         name: 'Save Changes',
         props: {},
-        position: { x: 30, y: 620 },
-        size: { width: 350, height: 50 },
+        position: { x: 140, y: 330 },
+        size: { width: 120, height: 40 },
         backgroundColor: '#10b981',
         interactions: {
           click: 'save_profile',
-          hover: 'scale'
+          hover: 'scale',
         },
-        dataBinding: {
-          api: 'https://api.example.com/profile/update'
-        }
       },
-      {
-        id: Date.now().toString() + '_logout_button',
-        type: 'button',
-        name: 'Logout',
-        props: {},
-        position: { x: 30, y: 690 },
-        size: { width: 350, height: 50 },
-        backgroundColor: '#ef4444',
-        interactions: {
-          click: 'logout_user',
-          hover: 'scale'
-        }
-      }
     ]
 
-    // Add components to context
-    profileComponents.forEach(comp => addComponent(comp))
-
-    // Update the current layer
-    updateScreen(activeScreen!, {
-      layers: currentScreen.layers.map(layer => 
+    // Add all components to the current screen's active layer
+    const updatedLayers = currentScreen.layers.map(layer =>
         layer.id === currentScreen.activeLayer 
           ? { ...layer, components: [...layer.components, ...profileComponents] }
           : layer
       )
-    })
+    updateScreen(currentScreen.id, { layers: updatedLayers })
   }
 
   const addEcommercePage = () => {
@@ -4082,7 +4073,8 @@ export function DesignMode({ projectId }: DesignModeProps) {
               userSelect: 'none',
               WebkitUserSelect: 'none',
               MozUserSelect: 'none',
-              msUserSelect: 'none'
+              msUserSelect: 'none',
+
             }}
           >
             {/* Clean Canvas Background like Logic Mode */}
