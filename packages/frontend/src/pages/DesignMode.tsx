@@ -27,7 +27,8 @@ import {
   Image,
   MousePointer,
   PenTool,
-  Minus
+  Minus,
+  Container
 } from 'lucide-react'
 
 interface Layer {
@@ -103,6 +104,7 @@ export function DesignMode({ projectId }: DesignModeProps) {
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
+
   const containerRef = useRef<HTMLDivElement>(null)
   
   // Sidebar collapse states
@@ -309,6 +311,8 @@ export function DesignMode({ projectId }: DesignModeProps) {
           console.log('Restoring pan:', savedPan)
           setPan(savedPan)
         }
+        
+
         
         if (savedSidebarStates) {
           console.log('Restoring sidebar states')
@@ -1269,9 +1273,9 @@ export function DesignMode({ projectId }: DesignModeProps) {
     if (canvasContainer) {
       const canvasRect = canvasContainer.getBoundingClientRect()
       
-      // Calculate the mouse position relative to the canvas, accounting for zoom and pan
-      const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
-      const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
+      // Calculate the mouse position relative to the canvas, accounting for zoom
+      const mouseX = (e.clientX - canvasRect.left) / zoom
+      const mouseY = (e.clientY - canvasRect.top) / zoom
       
       // Calculate the screen's position within the canvas
       const currentScreen = screens.find(s => s.id === activeScreen)
@@ -1402,48 +1406,27 @@ export function DesignMode({ projectId }: DesignModeProps) {
     }
   }
 
-  // Pan functionality
+  // Pan functionality (disabled - no-op functions)
   const handleMouseDownPan = (e: React.MouseEvent) => {
-    // Only pan if not clicking on a component and using middle mouse, Alt+Left, or left click on empty space
-    if ((e.button === 1 || (e.button === 0 && e.altKey) || (e.button === 0 && e.target === e.currentTarget))) {
-    e.preventDefault()
-      e.stopPropagation()
-    setIsPanning(true)
-      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y })
-    }
+    // Panning disabled
   }
 
   const handleMouseMovePan = (e: React.MouseEvent) => {
-    if (isPanning) {
-    e.preventDefault()
-      e.stopPropagation()
-      const newPanX = e.clientX - panStart.x
-      const newPanY = e.clientY - panStart.y
-      setPan({
-        x: newPanX,
-        y: newPanY
-      })
-    }
+    // Panning disabled
   }
 
   const handleMouseUpPan = () => {
-    if (isPanning) {
-    setIsPanning(false)
-    }
+    // Panning disabled
   }
 
   const handleMouseEnter = () => {
-    if (isPanning) {
-      document.body.style.cursor = 'grabbing'
-    }
+    // Panning disabled
   }
 
   const handleMouseLeave = () => {
-    if (isPanning) {
-      setIsPanning(false)
-      document.body.style.cursor = 'default'
-    }
+    // Panning disabled
   }
+
 
   // Screen dragging handlers
   const handleScreenMouseDown = (e: React.MouseEvent, screenId: string) => {
@@ -2982,25 +2965,29 @@ export function DesignMode({ projectId }: DesignModeProps) {
   }, [fetchProjectInfo])
 
   // Toolbar state
-  const [activeTool, setActiveTool] = useState<'select' | 'rectangle' | 'circle' | 'triangle' | 'text' | 'image' | 'line'>('select')
+  const [activeTool, setActiveTool] = useState<'select' | 'rectangle' | 'circle' | 'triangle' | 'text' | 'image' | 'line' | 'container'>('select')
   const [isDrawing, setIsDrawing] = useState(false)
   const [drawingStart, setDrawingStart] = useState({ x: 0, y: 0 })
   const [currentDrawing, setCurrentDrawing] = useState<any>(null)
 
   // Toolbar functions
-  const handleToolSelect = (tool: 'select' | 'rectangle' | 'circle' | 'triangle' | 'text' | 'image' | 'line') => {
+  const handleToolSelect = (tool: 'select' | 'rectangle' | 'circle' | 'triangle' | 'text' | 'image' | 'line' | 'container') => {
     setActiveTool(tool)
   }
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    console.log('Canvas mouse down, activeTool:', activeTool)
+    
     if (activeTool === 'select') {
       // Handle selection
       return
     }
 
     const rect = e.currentTarget.getBoundingClientRect()
-    const x = (e.clientX - rect.left - pan.x) / zoom
-    const y = (e.clientY - rect.top - pan.y) / zoom
+    const x = (e.clientX - rect.left) / zoom
+    const y = (e.clientY - rect.top) / zoom
+
+    console.log('Starting drawing at:', x, y)
 
     setIsDrawing(true)
     setDrawingStart({ x, y })
@@ -3022,11 +3009,13 @@ export function DesignMode({ projectId }: DesignModeProps) {
     if (!isDrawing || !currentDrawing) return
 
     const rect = e.currentTarget.getBoundingClientRect()
-    const x = (e.clientX - rect.left - pan.x) / zoom
-    const y = (e.clientY - rect.top - pan.y) / zoom
+    const x = (e.clientX - rect.left) / zoom
+    const y = (e.clientY - rect.top) / zoom
 
     const width = Math.abs(x - drawingStart.x)
     const height = Math.abs(y - drawingStart.y)
+
+    console.log('Drawing update:', width, height)
 
     setCurrentDrawing({
       ...currentDrawing,
@@ -3036,7 +3025,21 @@ export function DesignMode({ projectId }: DesignModeProps) {
   }
 
   const handleCanvasMouseUp = () => {
+    console.log('Canvas mouse up, isDrawing:', isDrawing, 'currentDrawing:', currentDrawing)
+    
     if (!isDrawing || !currentDrawing) return
+
+    console.log('Finishing drawing for tool:', activeTool)
+
+    // If container tool is active, show add screen popup
+    if (activeTool === 'container') {
+      console.log('Showing screen selector for container')
+      setShowScreenSelector(true)
+      setIsDrawing(false)
+      setCurrentDrawing(null)
+      setActiveTool('select')
+      return
+    }
 
     // Convert drawing to component
     const component: Component = {
@@ -4672,6 +4675,19 @@ export function DesignMode({ projectId }: DesignModeProps) {
             title="Select (V)"
           >
             <MousePointer className="w-5 h-5" />
+          </button>
+
+          {/* Container Tool */}
+          <button
+            onClick={() => handleToolSelect('container')}
+            className={`p-2 rounded-lg transition-all duration-200 ${
+              activeTool === 'container' 
+                ? 'bg-blue-500 text-white shadow-md' 
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+            }`}
+            title="Container (C)"
+          >
+            <Container className="w-5 h-5" />
           </button>
 
           {/* Rectangle Tool */}
