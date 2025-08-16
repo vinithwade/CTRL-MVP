@@ -1,68 +1,86 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { useNavigation } from '../contexts/NavigationContext'
 import { useDesign, Component } from '../contexts/DesignContext'
-import { useNavigate } from 'react-router-dom'
 import { ProjectService } from '@/services/projectService'
 import { 
-  Move,
-  RotateCcw, 
-  Trash2, 
-  Eye, 
+  Plus,
   Layers, 
-  Settings, 
-  Palette, 
   Square, 
-  ChevronDown,
-  Layout,
-  Database,
+  Circle,
+  Type,
+  Image,
+  Container,
   Smartphone,
+  Tablet,
+  Monitor,
+  Hand,
+  Eye,
+  EyeOff,
+  Lock,
+  Unlock,
+  ChevronDown,
+  ChevronRight,
+  Move,
+  RotateCcw,
+  Copy,
+  Trash2,
   ZoomIn,
   ZoomOut,
   Maximize2,
+  Star as StarIcon,
+  Pentagon,
+  MessageSquare,
+  StickyNote,
+  Ruler,
+  Settings,
+  Palette,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignJustify,
+  X,
+  Layout,
   GitBranch,
   Code,
-  Circle,
-  Triangle,
-  Type,
-  Image,
   MousePointer,
-  PenTool,
   Minus,
-  Container
+  ArrowRight
 } from 'lucide-react'
-
-interface Layer {
-  id: string
-  name: string
-  visible: boolean
-  locked: boolean
-  components: Component[]
-}
-
-interface Variable {
-  id: string
-  name: string
-  type: 'string' | 'number' | 'boolean' | 'array' | 'object'
-  value: any
-  scope: 'global' | 'local'
-}
-
-interface Screen {
-  id: string
-  name: string
-  width: number
-  height: number
-  type: 'mobile' | 'tablet' | 'desktop' | 'custom'
-  layers: Layer[]
-  activeLayer: string
-}
 
 interface DesignModeProps {
   projectId?: string
 }
 
+interface CanvasPosition {
+  x: number
+  y: number
+}
+
+interface CanvasState {
+  zoom: number
+  pan: CanvasPosition
+  isDragging: boolean
+  dragStart: CanvasPosition
+}
+
+const COMPONENT_LIBRARY = [
+  { type: 'button', name: 'Button', icon: Square },
+  { type: 'text', name: 'Text', icon: Type },
+  { type: 'image', name: 'Image', icon: Image },
+  { type: 'container', name: 'Container', icon: Container },
+  { type: 'input', name: 'Input', icon: Square },
+  { type: 'card', name: 'Card', icon: Square },
+]
+
+const SCREEN_PRESETS = [
+  { name: 'iPhone 14', width: 393, height: 852, type: 'mobile' as const, icon: Smartphone },
+  { name: 'iPad', width: 768, height: 1024, type: 'tablet' as const, icon: Tablet },
+  { name: 'Desktop', width: 1440, height: 900, type: 'desktop' as const, icon: Monitor },
+  { name: 'Custom', width: 400, height: 600, type: 'custom' as const, icon: Square },
+]
+
 export function DesignMode({ projectId }: DesignModeProps) {
-  const navigate = useNavigate();
   const { navigateToMode } = useNavigation()
   const { 
     screens, 
@@ -74,4711 +92,4135 @@ export function DesignMode({ projectId }: DesignModeProps) {
     addComponent, 
     updateComponent, 
     deleteComponent, 
+    getComponentsByScreen,
     screenPositions,
-    setScreenPositions,
-    updateScreenPosition
+    updateScreenPosition,
+    loadDesignState
   } = useDesign()
   
-  // Add state for project information
-  const [projectInfo, setProjectInfo] = useState<{ name: string; language: string; device: string } | null>(null)
-  const [loadingProject, setLoadingProject] = useState(false)
-  const [isLoadingData, setIsLoadingData] = useState(false) // Add loading state to prevent save during load
-  const [hasLoadedData, setHasLoadedData] = useState(false) // Track if data has been loaded
-  const [isSaving, setIsSaving] = useState(false) // Add saving state indicator
-  const [savedIndicator, setSavedIndicator] = useState(false) // Add saved indicator
-  const [selectedComponent, setSelectedComponent] = useState<Component | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const [isLoadingData, setIsLoadingData] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null)
+  const [expandedLayers, setExpandedLayers] = useState<Set<string>>(new Set(['layer-1']))
+  const [expandedComponentIds, setExpandedComponentIds] = useState<Set<string>>(new Set())
+  const [layerDragPreview, setLayerDragPreview] = useState<{
+    screenId: string
+    targetId: string | null
+    position: 'before' | 'after' | 'inside' | null
+  } | null>(null)
+  const [showScreenPresets, setShowScreenPresets] = useState(false)
+  const [leftSidebarVisible, setLeftSidebarVisible] = useState(false)
+  const [rightSidebarVisible, setRightSidebarVisible] = useState(false)
+  const [editingScreenId, setEditingScreenId] = useState<string | null>(null)
+  const [editingScreenName, setEditingScreenName] = useState<string>('')
+  const [highlightedScreenId, setHighlightedScreenId] = useState<string | null>(null)
+  const [hasInitialized, setHasInitialized] = useState(false)
+  const isCreatingDefaultScreen = useRef(false)
   
-  // Component resizing state
-  const [isResizing, setIsResizing] = useState(false)
-  const [resizeHandle, setResizeHandle] = useState<'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | null>(null)
-  const [resizeStartPos, setResizeStartPos] = useState({ x: 0, y: 0 })
-  const [resizeStartSize, setResizeStartSize] = useState({ width: 0, height: 0 })
-  const [showScreenSelector, setShowScreenSelector] = useState(false)
-  
-  // Drag and drop from library state
-  const [isDraggingFromLibrary, setIsDraggingFromLibrary] = useState(false)
-  const [draggedComponentType, setDraggedComponentType] = useState<string | null>(null)
-  
-  const [variables, setVariables] = useState<Variable[]>([])
-  const [activeTab, setActiveTab] = useState<'file' | 'assets'>('file')
+  // Canvas state
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
-  
-  // Reset pan to center
-  const resetPan = () => {
-    setPan({ x: 0, y: 0 })
-  }
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
+  const pasteImageCounterRef = useRef(0)
+  
+  // Screen dragging state
+  const [isDraggingScreen, setIsDraggingScreen] = useState(false)
+  const [draggedScreenId, setDraggedScreenId] = useState<string | null>(null)
+  const [screenDragStart, setScreenDragStart] = useState({ x: 0, y: 0 })
+  const screenDragElementRef = useRef<HTMLElement | null>(null)
+  const screenDragBasePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const screenDragLivePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const screenDragRafIdRef = useRef<number | null>(null)
 
+  const canvasRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  
-  // Sidebar collapse states
-  const [sidebarStates, setSidebarStates] = useState({
-    library: true,
-    screens: true,
-    layers: true
-  })
-  
-  // Sidebar visibility state
-  const [sidebarVisible, setSidebarVisible] = useState(true)
-  
-  // Screen positions for dragging
-
-  const [draggedScreen, setDraggedScreen] = useState<string | null>(null)
-  const [screenDragOffset, setScreenDragOffset] = useState({ x: 0, y: 0 })
-
-  // Cross-screen component dragging
   const [isDraggingComponent, setIsDraggingComponent] = useState(false)
-  const [draggedComponent, setDraggedComponent] = useState<Component | null>(null)
-  const [sourceScreenId, setSourceScreenId] = useState<string | null>(null)
-  const [sourceLayerId, setSourceLayerId] = useState<string | null>(null)
+  const [draggedComponentType, setDraggedComponentType] = useState<string | null>(null)
 
-  const currentScreen = screens.find(screen => screen.id === activeScreen)
-  const currentLayer = currentScreen?.layers.find(layer => layer.id === currentScreen.activeLayer)
-  
-  // Keep selectedComponent in sync with actual component data
-  const selectedComponentData = selectedComponent 
-    ? currentLayer?.components.find(comp => comp.id === selectedComponent.id) || null
-    : null
+  // Component dragging within a screen
+  const [draggingComponentId, setDraggingComponentId] = useState<string | null>(null)
+  const [draggingComponentScreenId, setDraggingComponentScreenId] = useState<string | null>(null)
+  const [componentDragOffset, setComponentDragOffset] = useState({ x: 0, y: 0 })
+  const draggingElementRef = useRef<HTMLElement | null>(null)
+  const draggingLivePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const draggingBasePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const rafIdRef = useRef<number | null>(null)
+  // Cached metrics for fast drag computations
+  const draggingScreenPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const draggingScreenBoundsRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 })
+  const draggingComponentSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 })
+  // Optional parent container metrics for nested dragging
+  const draggingContainerPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const draggingContainerBoundsRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 })
+  const draggingParentIdRef = useRef<string | null>(null)
+  // On-canvas guides and measurement badge during drag
+  const [dragGuides, setDragGuides] = useState<{
+    screenId: string | null,
+    offsetX: number,
+    offsetY: number,
+    v: number[],
+    h: number[],
+    badge: { x: number; y: number; text: string } | null
+  }>({ screenId: null, offsetX: 0, offsetY: 0, v: [], h: [], badge: null })
 
-  // Debug logging for Properties panel sync
+  // Drawing throttling (for smoother/faster rectangle draw)
+  const drawingRafIdRef = useRef<number | null>(null)
+  const drawingPendingRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null)
+
+  // Tools (Figma-like): move/select, hand (pan), scale (zoom), shapes, media, frame and annotations
+  type Tool =
+    | 'select'
+    | 'move'
+    | 'hand'
+    | 'scale'
+    | 'rectangle'
+    | 'ellipse'
+    | 'line'
+    | 'arrow'
+    | 'polygon'
+    | 'star'
+    | 'text'
+    | 'image'
+    | 'frame'
+    | 'comment'
+    | 'annotation'
+    | 'measurement'
+  const [activeTool, setActiveTool] = useState<Tool>('select')
+  const previousToolRef = useRef<Tool | null>(null)
+  const isSpacePressedRef = useRef(false)
+  const [isDrawing, setIsDrawing] = useState(false)
+  const [drawingComponentId, setDrawingComponentId] = useState<string | null>(null)
+  const [drawingStart, setDrawingStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [drawingScreenId, setDrawingScreenId] = useState<string | null>(null)
+
+  // Grid/snapping controls
+  const [snapToGrid, setSnapToGrid] = useState<boolean>(true)
+  const [gridSize, setGridSize] = useState<number>(20)
+
+  // Toolbar grouping dropdowns
+  const [showCursorMenu, setShowCursorMenu] = useState(false)
+  const [showShapesMenu, setShowShapesMenu] = useState(false)
+  const [showMediaMenu, setShowMediaMenu] = useState(false)
+  const [showCommentsMenu, setShowCommentsMenu] = useState(false)
+  const [showFrameMenu, setShowFrameMenu] = useState(false)
+  const [componentSearchQuery, setComponentSearchQuery] = useState('')
+  const [isSearchingComponents, setIsSearchingComponents] = useState(false)
+  const [remoteComponentResults, setRemoteComponentResults] = useState<{ name: string; description?: string; link?: string }[]>([])
+  const [remoteComponentPreviews, setRemoteComponentPreviews] = useState<Record<string, string>>({})
+  const searchDebounceRef = useRef<number | null>(null)
+
+  // Full screen canvas toggle
+  const [isFullScreen, setIsFullScreen] = useState(false)
+  const prevLeftSidebarRef = useRef<boolean>(true)
+  const prevRightSidebarRef = useRef<boolean>(false)
+
+  // Ensure only one dropdown is open at a time
+  const closeAllMenus = useCallback(() => {
+    setShowCursorMenu(false)
+    setShowShapesMenu(false)
+    setShowMediaMenu(false)
+    setShowCommentsMenu(false)
+    setShowFrameMenu(false)
+  }, [])
+
+  // Shortcut: V = Move/Select tool
   useEffect(() => {
-    if (selectedComponentData) {
-      console.log('Properties panel synced with component:', selectedComponentData)
+    const onKeySelect = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const tag = (target?.tagName || '').toLowerCase()
+      const isTyping = tag === 'input' || tag === 'textarea' || target?.isContentEditable
+      if (isTyping) return
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        const k = e.key.toLowerCase()
+        if (k === 'v') {
+          setActiveTool('select')
+          closeAllMenus()
+        } else if (k === 'f') {
+          setActiveTool('frame')
+          // open only frame menu; close others
+          closeAllMenus()
+          setShowFrameMenu(true)
+        }
+      }
     }
-  }, [selectedComponentData])
+    document.addEventListener('keydown', onKeySelect)
+    return () => document.removeEventListener('keydown', onKeySelect)
+  }, [closeAllMenus])
 
-  // Debug loading state changes
+  // Remote component search (npm registry) - only when local library has no matches
   useEffect(() => {
-    console.log('Loading state changed:', { isLoadingData, hasLoadedData })
-  }, [isLoadingData, hasLoadedData])
+    const q = componentSearchQuery.trim()
+    if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current)
 
-  // Monitor screens changes and ensure proper loading
-  useEffect(() => {
-    console.log('Screens changed:', { 
-      screensCount: screens.length, 
-      hasLoadedData, 
-      isLoadingData,
-      activeScreen,
-      screenNames: screens.map(s => s.name)
+    // Reset state if too short
+    if (q.length < 2) {
+      setRemoteComponentResults([])
+      setIsSearchingComponents(false)
+      return
+    }
+
+    // Check local library first
+    const localMatches = COMPONENT_LIBRARY.filter(c =>
+      c.name.toLowerCase().includes(q.toLowerCase()) ||
+      c.type.toLowerCase().includes(q.toLowerCase())
+    )
+
+    if (localMatches.length > 0) {
+      // We have local results; don't hit the network
+      setRemoteComponentResults([])
+      setIsSearchingComponents(false)
+      return
+    }
+
+    // No local results; fetch from npm registry
+    setIsSearchingComponents(true)
+    searchDebounceRef.current = window.setTimeout(async () => {
+      try {
+        const resp = await fetch(`https://registry.npmjs.org/-/v1/search?text=react%20component%20${encodeURIComponent(q)}&size=8`)
+        const data = await resp.json().catch(() => ({ objects: [] }))
+        const results = Array.isArray(data?.objects)
+          ? data.objects.map((o: any) => ({
+              name: o?.package?.name || 'Unknown',
+              description: o?.package?.description || '',
+              link: o?.package?.links?.npm || ''
+            }))
+          : []
+        setRemoteComponentResults(results)
+        // fetch basic preview images if available from unpkg README badges or repo social preview (best-effort)
+        const previews: Record<string, string> = {}
+        await Promise.all(results.slice(0, 4).map(async (r: { name: string }) => {
+          try {
+            const pkgReadme = await fetch(`https://unpkg.com/${r.name}/README.md`).then((res) => res.text()).catch(() => '')
+            const m = pkgReadme.match(/!\[[^\]]*\]\((https?:[^)]+)\)/)
+            if (m && m[1]) previews[r.name] = m[1]
+          } catch {}
+        }))
+        setRemoteComponentPreviews(previews)
+      } catch {
+        setRemoteComponentResults([])
+      } finally {
+        setIsSearchingComponents(false)
+      }
+    }, 350)
+
+    return () => {
+      if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current)
+    }
+  }, [componentSearchQuery])
+
+  const addExternalComponentToActiveScreen = useCallback((displayName: string, source?: { package?: string; link?: string }) => {
+    if (!activeScreen) return
+    const targetScreen = screens.find(s => s.id === activeScreen)
+    if (!targetScreen) return
+    const activeLayer = targetScreen.layers.find(l => l.id === targetScreen.activeLayer)
+    const nextZ = activeLayer ? Math.max(0, ...activeLayer.components.map(c => c.zIndex || 0)) + 1 : 1
+    const newComponent: Component = {
+      id: `component-${Date.now()}`,
+      type: 'external',
+      name: displayName,
+      props: { source: 'npm', package: source?.package, link: source?.link },
+      position: { x: 24, y: 24 },
+      size: { width: 160, height: 48 },
+      backgroundColor: '#ffffff',
+      zIndex: nextZ
+    }
+    // Add to active layer of screen
+    const updatedLayers = targetScreen.layers.map(layer =>
+      layer.id === targetScreen.activeLayer
+        ? { ...layer, components: [...layer.components, newComponent] }
+        : layer
+    )
+    updateScreen(targetScreen.id, { layers: updatedLayers })
+    addComponent(newComponent)
+    setSelectedComponentId(newComponent.id)
+    setRightSidebarVisible(true)
+  }, [activeScreen, screens, updateScreen, addComponent])
+
+  // Resize state for components
+  const [resizingComponentId, setResizingComponentId] = useState<string | null>(null)
+  const [resizingScreenId, setResizingScreenId] = useState<string | null>(null)
+  const resizeBaseRef = useRef<{ x: number; y: number; width: number; height: number }>({ x: 0, y: 0, width: 0, height: 0 })
+  const resizeLiveRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 })
+  const resizeRafIdRef = useRef<number | null>(null)
+
+  // Helpers for cross-screen/component ordering (z-index across entire screen)
+  const getCombinedComponents = useCallback((screen: typeof screens[number]) => {
+    return screen.layers.flatMap(l => l.components)
+  }, [])
+
+  // Utility: deep update a component by id within screen layers (supports nested children)
+  const deepUpdateComponentInScreen = useCallback((screenId: string, componentId: string, updates: Partial<Component>) => {
+    const screen = screens.find(s => s.id === screenId)
+    if (!screen) return
+
+    const updateComponentsDeep = (components: Component[]): Component[] => {
+      return components.map(existing => {
+        const updatedSelf = existing.id === componentId ? { ...existing, ...updates } : existing
+        if (existing.children && existing.children.length > 0) {
+          const updatedChildren = updateComponentsDeep(existing.children)
+          if (updatedChildren !== existing.children) {
+            return { ...updatedSelf, children: updatedChildren }
+          }
+        }
+        return updatedSelf
+      })
+    }
+
+    const updatedLayers = screen.layers.map(layer => ({
+      ...layer,
+      components: updateComponentsDeep(layer.components)
+    }))
+    updateScreen(screenId, { layers: updatedLayers })
+  }, [screens, updateScreen])
+
+  // Utility: add child to a parent component by id (nested)
+  const addChildComponentInScreen = useCallback((screenId: string, parentId: string, child: Component) => {
+    const screen = screens.find(s => s.id === screenId)
+    if (!screen) return
+    const addChildDeep = (components: Component[]): Component[] => {
+      return components.map(existing => {
+        if (existing.id === parentId) {
+          const nextChildren = [...(existing.children || []), child]
+          return { ...existing, children: nextChildren }
+        }
+        if (existing.children && existing.children.length > 0) {
+          return { ...existing, children: addChildDeep(existing.children) }
+        }
+        return existing
+      })
+    }
+    const updatedLayers = screen.layers.map(layer => ({
+      ...layer,
+      components: addChildDeep(layer.components)
+    }))
+    updateScreen(screenId, { layers: updatedLayers })
+  }, [screens, updateScreen])
+
+  // Utility: find parent (top-level) of a component by id (one nesting level)
+  const findParentInScreen = useCallback((screen: typeof screens[number], childId: string): Component | null => {
+    for (const layer of screen.layers) {
+      for (const comp of layer.components) {
+        if (comp.children && comp.children.some(c => c.id === childId)) return comp
+      }
+    }
+    return null
+  }, [])
+
+  const removeComponentFromScreen = useCallback((screen: typeof screens[number], componentId: string) => {
+    return screen.layers.map(l => ({ ...l, components: l.components.filter(c => c.id !== componentId) }))
+  }, [])
+
+  const addComponentToLayer = useCallback((screen: typeof screens[number], component: Component, layerId?: string) => {
+    const targetLayerId = layerId || screen.activeLayer
+    return screen.layers.map(l => (
+      l.id === targetLayerId ? { ...l, components: [...l.components, component] } : l
+    ))
+  }, [])
+
+  const applyZOrder = useCallback((screen: typeof screens[number], orderedIds: string[]) => {
+    const idToZ: Record<string, number> = {}
+    const total = orderedIds.length
+    orderedIds.forEach((id, idx) => { idToZ[id] = total - idx })
+    return screen.layers.map(l => ({
+      ...l,
+      components: l.components.map(c => (c.id in idToZ ? { ...c, zIndex: idToZ[c.id] } : c))
+    }))
+  }, [])
+
+  const updateComponentInScreen = useCallback((screenId: string, componentId: string, updates: Partial<Component>) => {
+    const screen = screens.find(s => s.id === screenId)
+    if (!screen) return
+    const updatedLayers = screen.layers.map(layer => {
+      const hasComponent = layer.components.some(c => c.id === componentId)
+      if (!hasComponent) return layer
+      return {
+        ...layer,
+        components: layer.components.map(c => (c.id === componentId ? { ...c, ...updates } : c))
+      }
     })
+    updateScreen(screenId, { layers: updatedLayers })
+  }, [screens, updateScreen])
+
+  // Find selected component live from screens to keep properties in sync
+  const findComponentById = useCallback((componentId: string | null): { component: Component | null, screenId: string | null } => {
+    if (!componentId) return { component: null, screenId: null }
+    for (const scr of screens) {
+      for (const layer of scr.layers) {
+        const comp = layer.components.find(c => c.id === componentId)
+        if (comp) return { component: comp, screenId: scr.id }
+      }
+    }
+    return { component: null, screenId: null }
+  }, [screens])
+
+  const { component: selectedComponent, screenId: selectedComponentScreenId } = findComponentById(selectedComponentId)
+
+  // Load design data for the project
+  useEffect(() => {
+    if (projectId) {
+      console.log('Project changed, resetting initialization for:', projectId)
+      setHasInitialized(false) // Reset initialization for new project
+      isCreatingDefaultScreen.current = false // Reset creation flag
+      loadDesignData()
+    }
+  }, [projectId])
+
+  // Auto-create a default screen if none exist - DISABLED
+  // Users will start with a clean canvas and add screens manually
+  /*
+  useEffect(() => {
+    if (!isLoadingData && screens.length === 0 && !hasInitialized && projectId && !isCreatingDefaultScreen.current) {
+      console.log('Auto-creating default screen for project:', projectId)
+      isCreatingDefaultScreen.current = true
+      // Add a default mobile screen to get users started
+      handleAddDefaultScreen() // Create Main Page
+      setLeftSidebarVisible(true) // Show sidebar when screens exist
+      setHasInitialized(true) // Prevent creating multiple screens
+    }
+  }, [isLoadingData, screens.length, hasInitialized, projectId])
+  */
+
+  const loadDesignData = async () => {
+    if (!projectId || isLoadingData) return
     
-    // If we have loaded data and screens, but no active screen, set the first one
-    if (hasLoadedData && !isLoadingData && screens.length > 0 && !activeScreen) {
-      console.log('Setting first screen as active after load')
-      setActiveScreen(screens[0].id)
-    }
-  }, [screens, hasLoadedData, isLoadingData, activeScreen, setActiveScreen])
-
-  // Save project data functionality
-  const saveProjectData = useCallback(async () => {
-    if (!projectId) {
-      console.warn('No project ID available for saving')
-      return
-    }
-
-    // Prevent saving while loading data
-    if (isLoadingData) {
-      console.log('Skipping save - data is currently loading')
-      return
-    }
-
-    // Prevent multiple simultaneous saves
-    if (isSaving) {
-      console.log('Save already in progress, skipping...')
-      return
-    }
-
-    setIsSaving(true) // Set saving state
-    
-    // Add a timeout to prevent stuck saving state
-    const saveTimeout = setTimeout(() => {
-      console.warn('Save timeout reached, clearing saving state')
-      setIsSaving(false)
-    }, 10000) // 10 second timeout
-    
+    setIsLoadingData(true)
     try {
-      console.log('=== STARTING SAVE PROJECT DATA ===')
-      console.log('Saving project data with', screens.length, 'screens')
-      console.log('Screens data:', screens)
-      console.log('Active screen:', activeScreen)
-      console.log('Screen positions:', screenPositions)
-      
+      const designData = await ProjectService.getProjectData(projectId, 'design')
+      if (designData?.data) {
+        const data = designData.data
+        // Hydrate screens/activeScreen
+        if (data.screens && Array.isArray(data.screens)) {
+          loadDesignState({ screens: data.screens, activeScreen: data.activeScreen || null })
+        }
+        // Restore selected component, zoom/pan, and positions
+        if (data.selectedComponent) setSelectedComponentId(data.selectedComponent)
+        if (typeof data.zoom === 'number') setZoom(data.zoom)
+        if (data.pan && typeof data.pan.x === 'number' && typeof data.pan.y === 'number') setPan(data.pan)
+        if (data.screenPositions && typeof data.screenPositions === 'object') {
+          // Apply saved positions via updater
+          Object.entries(data.screenPositions as Record<string, {x:number;y:number}>).forEach(([sid, pos]) => {
+            updateScreenPosition(sid, pos)
+          })
+        }
+      } else {
+        // No design data found - start with empty canvas
+        console.log('No design data found, starting with empty canvas')
+      }
+    } catch (error) {
+      console.error('Error loading design data:', error)
+      // If there's an error loading, start with empty canvas
+      console.log('Error loading design data, starting with empty canvas')
+    } finally {
+      setIsLoadingData(false)
+    }
+  }
+
+
+
+  const saveDesignData = async () => {
+    if (!projectId || isLoadingData || isSaving) return
+    
+    setIsSaving(true)
+    try {
       const designData = {
-        screens, // Save screens to persist them
+        screens,
         activeScreen,
-        variables,
+        selectedComponent: selectedComponentId,
         zoom,
         pan,
-        sidebarStates,
-        screenPositions
+        screenPositions,
+        timestamp: Date.now()
       }
-
-      console.log('Saving design data:', designData)
-      const result = await ProjectService.saveProjectData(projectId, 'design', designData)
-      console.log('Project design data saved successfully:', result)
-      console.log('=== SAVE PROJECT DATA COMPLETED ===')
+      await ProjectService.saveProjectData(projectId, 'design', designData)
+      console.log('Design data saved successfully')
     } catch (error) {
-      console.error('Error saving project data:', error)
+      console.error('Error saving design data:', error)
     } finally {
-      clearTimeout(saveTimeout) // Clear the timeout
-      // Ensure saving state is cleared with a small delay to show the saved state
-      setTimeout(() => {
         setIsSaving(false)
-        setSavedIndicator(true) // Show saved indicator
-        console.log('Save completed, clearing saving state')
-        
-        // Hide saved indicator after 2 seconds
-        setTimeout(() => {
-          setSavedIndicator(false)
-        }, 2000)
-      }, 500)
     }
-  }, [projectId, screens, activeScreen, variables, zoom, pan, sidebarStates, screenPositions, isLoadingData])
+  }
 
-  // Manual save function
-  const manualSave = useCallback(async () => {
-    console.log('Manual save triggered')
-    await saveProjectData()
-  }, [saveProjectData])
+  // Undo/redo state for design
+  type DesignSnapshot = {
+    screens: typeof screens
+    activeScreen: typeof activeScreen
+    selectedComponentId: string | null
+    zoom: number
+    pan: { x: number; y: number }
+    screenPositions: typeof screenPositions
+  }
+  const [undoStack, setUndoStack] = useState<DesignSnapshot[]>([])
+  const [redoStack, setRedoStack] = useState<DesignSnapshot[]>([])
 
-  // Load project data functionality
-  const loadProjectData = useCallback(async () => {
-    if (!projectId) {
-      console.warn('No project ID available for loading')
-      return
+  const pushHistory = useCallback(() => {
+    const snapshot: DesignSnapshot = {
+      screens: JSON.parse(JSON.stringify(screens)),
+      activeScreen,
+      selectedComponentId,
+      zoom,
+      pan,
+      screenPositions: JSON.parse(JSON.stringify(screenPositions))
     }
+    setUndoStack(prev => {
+      const next = [...prev, snapshot]
+      return next.length > 50 ? next.slice(next.length - 50) : next
+    })
+    setRedoStack([])
+  }, [screens, activeScreen, selectedComponentId, zoom, pan, screenPositions])
 
-    console.log('=== STARTING LOAD PROJECT DATA ===')
-    console.log('Project ID:', projectId)
-    console.log('Current screens before load:', screens.length)
-    console.log('Current active screen:', activeScreen)
-    
-    setIsLoadingData(true) // Set loading state to prevent saves
-    try {
-      console.log('Loading project data for projectId:', projectId)
-      const designData = await ProjectService.getProjectData(projectId, 'design')
-      
-      console.log('Raw design data from service:', designData)
-      
-      if (designData && designData.data) {
-        console.log('Found saved design data:', designData.data)
-        const { screens: savedScreens, activeScreen: savedActiveScreen, variables: savedVariables, zoom: savedZoom, pan: savedPan, sidebarStates: savedSidebarStates, screenPositions: savedScreenPositions } = designData.data
-        
-        console.log('Parsed saved screens:', savedScreens)
-        console.log('Saved active screen:', savedActiveScreen)
-        
-        // Always restore screens if they exist, regardless of current screens length
-        if (savedScreens && Array.isArray(savedScreens) && savedScreens.length > 0) {
-          console.log('Restoring', savedScreens.length, 'screens from saved data')
-          console.log('Current screens before restore:', screens.length)
-          
-          // Clear existing screens first to ensure clean state
-          screens.forEach(screen => {
-            console.log('Removing existing screen:', screen.name, screen.id)
-            deleteScreen(screen.id)
-          })
-          
-          // Add saved screens
-          savedScreens.forEach((screen: Screen) => {
-            console.log('Adding saved screen:', screen.name, screen.id)
-            addScreen(screen)
-          })
-        
-          console.log('Screens restored successfully. New count:', screens.length + savedScreens.length)
-          
-          // Set active screen after a short delay to ensure screens are loaded
-          setTimeout(() => {
-        if (savedActiveScreen) {
-              console.log('Setting saved active screen after delay:', savedActiveScreen)
-          setActiveScreen(savedActiveScreen)
-            } else if (savedScreens.length > 0) {
-              console.log('Setting first screen as active after delay')
-              setActiveScreen(savedScreens[0].id)
-            }
-          }, 100)
-        } else {
-          console.log('No saved screens found in design data')
-        }
-        
-        // Restore other state after screens are loaded
-        if (savedVariables) {
-          console.log('Restoring variables')
-          setVariables(savedVariables)
-        }
-        
-        if (savedZoom) {
-          console.log('Restoring zoom:', savedZoom)
-          setZoom(savedZoom)
-        }
-        
-        if (savedPan) {
-          console.log('Restoring pan:', savedPan)
-          setPan(savedPan)
-        }
-        
-
-        
-        if (savedSidebarStates) {
-          console.log('Restoring sidebar states')
-          setSidebarStates(savedSidebarStates)
-        }
-        
-        if (savedScreenPositions) {
-          console.log('Restoring screen positions')
-          setScreenPositions(savedScreenPositions)
-        }
-        
-        console.log('Project design data loaded successfully')
-      } else {
-        console.log('No saved design data found - this is a new project')
+  const undo = useCallback(() => {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev
+      const last = prev[prev.length - 1]
+      const rest = prev.slice(0, -1)
+      const current: DesignSnapshot = {
+        screens: JSON.parse(JSON.stringify(screens)),
+        activeScreen,
+        selectedComponentId,
+        zoom,
+        pan,
+        screenPositions: JSON.parse(JSON.stringify(screenPositions))
       }
-    } catch (error) {
-      console.error('Error loading project data:', error)
-    } finally {
-      console.log('Loading completed, clearing loading state')
-      console.log('Final screens count:', screens.length)
-      console.log('Final active screen:', activeScreen)
-      console.log('=== LOAD PROJECT DATA COMPLETED ===')
-      setIsLoadingData(false) // Clear loading state
-      setHasLoadedData(true) // Mark as loaded
-    }
-  }, [projectId, addScreen, setActiveScreen, setVariables, setZoom, setPan, setSidebarStates, setScreenPositions, screens, deleteScreen])
+      setRedoStack(r => [...r, current])
+      loadDesignState({ screens: last.screens, activeScreen: last.activeScreen })
+      setSelectedComponentId(last.selectedComponentId)
+      setZoom(last.zoom)
+      setPan(last.pan)
+      // apply positions
+      Object.entries(last.screenPositions).forEach(([sid, pos]) => updateScreenPosition(sid, pos as any))
+      return rest
+    })
+  }, [screens, activeScreen, selectedComponentId, zoom, pan, screenPositions, loadDesignState, updateScreenPosition])
 
-  // Auto-save functionality
+  const redo = useCallback(() => {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev
+      const last = prev[prev.length - 1]
+      const rest = prev.slice(0, -1)
+      const current: DesignSnapshot = {
+        screens: JSON.parse(JSON.stringify(screens)),
+        activeScreen,
+        selectedComponentId,
+        zoom,
+        pan,
+        screenPositions: JSON.parse(JSON.stringify(screenPositions))
+      }
+      setUndoStack(u => [...u, current])
+      loadDesignState({ screens: last.screens, activeScreen: last.activeScreen })
+      setSelectedComponentId(last.selectedComponentId)
+      setZoom(last.zoom)
+      setPan(last.pan)
+      Object.entries(last.screenPositions).forEach(([sid, pos]) => updateScreenPosition(sid, pos as any))
+      return rest
+    })
+  }, [screens, activeScreen, selectedComponentId, zoom, pan, screenPositions, loadDesignState, updateScreenPosition])
+
   useEffect(() => {
-    if (projectId) {
+    const onKey = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toLowerCase().includes('mac')
+      const ctrlOrMeta = isMac ? e.metaKey : e.ctrlKey
+      if (ctrlOrMeta && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+      }
+      // Delete selected component with Delete/Backspace when not typing
+      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedComponentId) {
+        const target = e.target as HTMLElement | null
+        const tag = target?.tagName?.toLowerCase()
+        const isTyping = tag === 'input' || tag === 'textarea' || target?.isContentEditable
+        if (!isTyping) {
+          e.preventDefault()
+          deleteComponent(selectedComponentId)
+          setSelectedComponentId(null)
+          setRightSidebarVisible(false)
+        }
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [undo, redo, selectedComponentId, deleteComponent])
+
+  // Auto-save design data every 30 seconds
+  useEffect(() => {
+    if (!projectId) return
+    
       const autoSaveInterval = setInterval(() => {
-        console.log('Auto-saving project data...')
-        saveProjectData()
-      }, 30000) // Auto-save every 30 seconds
+      saveDesignData()
+    }, 30000) // 30 seconds
 
       return () => clearInterval(autoSaveInterval)
-    }
-  }, [projectId, saveProjectData])
+  }, [projectId, screens, activeScreen, selectedComponentId, zoom, pan, screenPositions])
 
-  // Save when screens change - with guard to prevent infinite loop
+  // Save on page hide/unload to persist last changes
   useEffect(() => {
-    if (projectId && screens.length > 0 && !isLoadingData && !isSaving) {
-      // Add a longer delay to prevent rapid saves
-      const timeoutId = setTimeout(() => {
-        console.log('Screens changed, saving project data...')
-        saveProjectData()
-      }, 10000) // 10 second delay to prevent rapid saves
-
-      return () => clearTimeout(timeoutId)
+    if (!projectId) return
+    const handler = () => saveDesignData()
+    window.addEventListener('visibilitychange', handler)
+    window.addEventListener('beforeunload', handler)
+    return () => {
+      window.removeEventListener('visibilitychange', handler)
+      window.removeEventListener('beforeunload', handler)
     }
-  }, [projectId, screens.length, saveProjectData, isLoadingData, isSaving]) // Use screens.length instead of screens to prevent unnecessary saves
+  }, [projectId, saveDesignData])
 
-  // Save when active screen changes
+    // Zoom and pan handlers
   useEffect(() => {
-    if (projectId && activeScreen && !isLoadingData && !isSaving) {
-      console.log('Active screen changed, saving project data...')
-      saveProjectData()
+    const isTypingTarget = (el: EventTarget | null) => {
+      const node = el as HTMLElement | null
+      return !!node && (node.tagName === 'INPUT' || node.tagName === 'TEXTAREA' || node.isContentEditable)
     }
-  }, [projectId, activeScreen, saveProjectData, isLoadingData, isSaving])
 
-  // Save when screen positions change
-  useEffect(() => {
-    if (projectId && Object.keys(screenPositions).length > 0 && !isLoadingData && !isSaving) {
-      console.log('Screen positions changed, saving project data...')
-      saveProjectData()
-    }
-  }, [projectId, screenPositions, saveProjectData, isLoadingData, isSaving])
-
-  // Load project data on mount - only once
-  useEffect(() => {
-    if (projectId) {
-      console.log('Loading project data on mount for projectId:', projectId)
-      
-      // Reset loading states to ensure fresh load
-      setIsLoadingData(false)
-      setHasLoadedData(false)
-      
-      // Add timeout to prevent infinite loading
-      const loadTimeout = setTimeout(() => {
-        if (isLoadingData) {
-          console.warn('Loading timeout reached, clearing loading state')
-          setIsLoadingData(false)
-          setHasLoadedData(true)
-        }
-      }, 5000) // 5 second timeout
-      
-      // Force load after a short delay to ensure context is ready
-      setTimeout(() => {
-      loadProjectData()
-      // Reset pan to center after loading
-      resetPan()
-      }, 100)
-      
-      return () => clearTimeout(loadTimeout)
-    }
-  }, [projectId]) // Remove loadProjectData from dependencies to prevent infinite loop
-
-  // Local update function that ensures proper synchronization
-  const updateComponentLocal = (componentId: string, updates: Partial<Component>) => {
-    console.log('Updating component:', componentId, 'with updates:', updates)
-    
-    // Update in global context
-    updateComponent(componentId, updates)
-    
-    // Also update in current screen's layers
-    if (currentScreen && currentLayer) {
-      const updatedLayers = currentScreen.layers.map(layer => ({
-        ...layer,
-        components: layer.components.map(comp => 
-          comp.id === componentId ? { ...comp, ...updates } : comp
-        )
-      }))
-      
-      updateScreen(activeScreen!, {
-        layers: updatedLayers
-      })
-      
-      console.log('Component updated in both global context and screen layers')
-      
-      // Trigger save when component is modified
-      if (projectId) {
-        console.log('Component modified, triggering save...')
-        // Add a small delay to prevent rapid saves
-        setTimeout(() => {
-          if (!isSaving && !isLoadingData) {
-            saveProjectData()
-          }
-        }, 2000) // 2 second delay to prevent rapid saves
-      }
-    }
-  }
-
-  const componentLibrary = [
-    { type: 'container', name: 'Container', icon: Layout },
-    { type: 'text', name: 'Text', icon: Palette },
-    { type: 'button', name: 'Button', icon: Settings },
-    { type: 'input', name: 'Input', icon: Database },
-    { type: 'image', name: 'Image', icon: Eye },
-    { type: 'form', name: 'Form', icon: Database },
-    { type: 'list', name: 'List', icon: Layers },
-    { type: 'table', name: 'Table', icon: Layout },
-    { type: 'chart', name: 'Chart', icon: Palette },
-    { type: 'map', name: 'Map', icon: Eye },
-    { type: 'video', name: 'Video', icon: Eye },
-    { type: 'audio', name: 'Audio', icon: Eye },
-    { type: 'canvas', name: 'Canvas', icon: Layout },
-    { type: 'svg', name: 'SVG', icon: Palette },
-    { type: 'webgl', name: 'WebGL', icon: Layout },
-    { type: 'vr', name: 'VR', icon: Eye },
-    { type: 'ar', name: 'AR', icon: Eye },
-    { type: '3d', name: '3D', icon: Layout }
-  ]
-
-  // Component preview renderer for library
-  const renderComponentPreview = (componentType: string) => {
-    switch (componentType) {
-      case 'container':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex flex-col">
-            <div className="flex items-center justify-between mb-1">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <div className="w-1 h-1 bg-gray-300 rounded-full"></div>
-            </div>
-            <div className="flex-1 bg-white rounded border border-gray-200 p-1">
-              <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-50 rounded"></div>
-            </div>
-          </div>
-        )
-      case 'text':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex flex-col justify-center">
-            <div className="w-3/4 h-2 bg-gray-300 rounded mb-1"></div>
-            <div className="w-full h-1 bg-gray-200 rounded mb-1"></div>
-            <div className="w-2/3 h-1 bg-gray-200 rounded"></div>
-          </div>
-        )
-      case 'button':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-16 h-6 bg-gradient-to-r from-blue-500 to-blue-600 rounded-md shadow-sm flex items-center justify-center">
-              <div className="w-8 h-1 bg-white bg-opacity-80 rounded"></div>
-            </div>
-          </div>
-        )
-      case 'input':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex flex-col justify-center">
-            <div className="w-1/2 h-1 bg-gray-300 rounded mb-1"></div>
-            <div className="w-full h-4 bg-white border border-gray-300 rounded-md"></div>
-          </div>
-        )
-      case 'image':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center">
-              <div className="w-6 h-6 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        )
-      case 'form':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex flex-col justify-center">
-            <div className="w-2/3 h-1 bg-gray-300 rounded mb-1"></div>
-            <div className="w-full h-3 bg-white border border-gray-300 rounded mb-1"></div>
-            <div className="w-full h-3 bg-white border border-gray-300 rounded mb-1"></div>
-            <div className="w-full h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded"></div>
-          </div>
-        )
-      case 'list':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex flex-col justify-center">
-            <div className="w-1/2 h-1 bg-gray-300 rounded mb-1"></div>
-            <div className="space-y-1">
-              <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 border border-gray-400 rounded"></div>
-                <div className="w-8 h-1 bg-gray-200 rounded"></div>
-              </div>
-              <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 border border-gray-400 rounded"></div>
-                <div className="w-6 h-1 bg-gray-200 rounded"></div>
-              </div>
-              <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 border border-gray-400 rounded"></div>
-                <div className="w-7 h-1 bg-gray-200 rounded"></div>
-              </div>
-            </div>
-          </div>
-        )
-      case 'table':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex flex-col justify-center">
-            <div className="w-full h-3 bg-gray-300 rounded mb-1"></div>
-            <div className="w-full h-2 bg-gray-200 rounded mb-1"></div>
-            <div className="w-full h-2 bg-gray-200 rounded mb-1"></div>
-            <div className="w-full h-2 bg-gray-200 rounded"></div>
-          </div>
-        )
-      case 'chart':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-white rounded border border-gray-200 p-1">
-              <div className="w-full h-full flex items-end justify-center space-x-1">
-                <div className="w-2 bg-blue-500 rounded-t" style={{ height: '60%' }}></div>
-                <div className="w-2 bg-green-500 rounded-t" style={{ height: '80%' }}></div>
-                <div className="w-2 bg-purple-500 rounded-t" style={{ height: '40%' }}></div>
-                <div className="w-2 bg-orange-500 rounded-t" style={{ height: '70%' }}></div>
-              </div>
-            </div>
-          </div>
-        )
-      case 'map':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center">
-              <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-            </div>
-          </div>
-        )
-      case 'video':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-red-400 to-red-500 rounded-lg flex items-center justify-center">
-              <div className="w-6 h-6 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        )
-      case 'audio':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-green-400 to-green-500 rounded-lg flex items-center justify-center">
-              <div className="w-6 h-6 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.794L4.383 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.383l4.617-3.794a1 1 0 011.383.07zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        )
-      case 'canvas':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-white border border-gray-300 rounded flex items-center justify-center">
-              <div className="w-4 h-4 bg-gradient-to-br from-yellow-400 to-orange-500 rounded"></div>
-            </div>
-          </div>
-        )
-      case 'svg':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-white border border-gray-300 rounded flex items-center justify-center">
-              <svg className="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-          </div>
-        )
-      case 'webgl':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-purple-900 rounded flex items-center justify-center">
-              <div className="w-4 h-4 bg-gradient-to-br from-blue-400 to-purple-400 rounded transform rotate-45"></div>
-            </div>
-          </div>
-        )
-      case 'vr':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-gray-800 to-black rounded flex items-center justify-center">
-              <div className="w-6 h-4 bg-gray-600 rounded-full"></div>
-            </div>
-          </div>
-        )
-      case 'ar':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-blue-900 to-indigo-900 rounded flex items-center justify-center">
-              <div className="w-5 h-5 border-2 border-blue-400 rounded-full"></div>
-            </div>
-          </div>
-        )
-      case '3d':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-gray-800 to-black rounded flex items-center justify-center">
-              <div className="w-4 h-4 bg-gradient-to-br from-red-500 to-pink-500 transform rotate-45"></div>
-            </div>
-          </div>
-        )
-      default:
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
-            <div className="w-4 h-4 bg-gray-400 rounded"></div>
-          </div>
-        )
-    }
-  }
-
-  const screenPresets = [
-    // iOS Devices
-    { 
-      name: 'iPhone 15 Pro Max', 
-      width: 430, 
-      height: 932, 
-      type: 'mobile' as const, 
-      icon: Smartphone,
-      description: 'iOS 6.7" display',
-      ratio: '19.5:9',
-      category: 'iOS'
-    },
-    { 
-      name: 'iPhone 15 Pro', 
-      width: 393, 
-      height: 852, 
-      type: 'mobile' as const, 
-      icon: Smartphone,
-      description: 'iOS 6.1" display',
-      ratio: '19.5:9',
-      category: 'iOS'
-    },
-    { 
-      name: 'iPhone 15', 
-      width: 393, 
-      height: 852, 
-      type: 'mobile' as const, 
-      icon: Smartphone,
-      description: 'iOS 6.1" display',
-      ratio: '19.5:9',
-      category: 'iOS'
-    },
-    { 
-      name: 'iPhone 15 Plus', 
-      width: 430, 
-      height: 932, 
-      type: 'mobile' as const, 
-      icon: Smartphone,
-      description: 'iOS 6.7" display',
-      ratio: '19.5:9',
-      category: 'iOS'
-    },
-    { 
-      name: 'iPhone 14', 
-      width: 390, 
-      height: 844, 
-      type: 'mobile' as const, 
-      icon: Smartphone,
-      description: 'iOS 6.1" display',
-      ratio: '19.5:9',
-      category: 'iOS'
-    },
-    { 
-      name: 'iPhone SE', 
-      width: 375, 
-      height: 667, 
-      type: 'mobile' as const, 
-      icon: Smartphone,
-      description: 'iOS 4.7" display',
-      ratio: '16:9',
-      category: 'iOS'
-    },
-    { 
-      name: 'iPad Pro 12.9"', 
-      width: 1024, 
-      height: 1366, 
-      type: 'tablet' as const, 
-      icon: Smartphone,
-      description: 'iOS 12.9" display',
-      ratio: '4:3',
-      category: 'iOS'
-    },
-    { 
-      name: 'iPad Pro 11"', 
-      width: 834, 
-      height: 1194, 
-      type: 'tablet' as const, 
-      icon: Smartphone,
-      description: 'iOS 11" display',
-      ratio: '4:3',
-      category: 'iOS'
-    },
-    { 
-      name: 'iPad Air', 
-      width: 820, 
-      height: 1180, 
-      type: 'tablet' as const, 
-      icon: Smartphone,
-      description: 'iOS 10.9" display',
-      ratio: '4:3',
-      category: 'iOS'
-    },
-    { 
-      name: 'iPad mini', 
-      width: 744, 
-      height: 1133, 
-      type: 'tablet' as const, 
-      icon: Smartphone,
-      description: 'iOS 8.3" display',
-      ratio: '4:3',
-      category: 'iOS'
-    },
-    
-    // Android Devices
-    { 
-      name: 'Samsung Galaxy S24 Ultra', 
-      width: 412, 
-      height: 892, 
-      type: 'mobile' as const, 
-      icon: Smartphone,
-      description: 'Android 6.8" display',
-      ratio: '19.3:9',
-      category: 'Android'
-    },
-    { 
-      name: 'Samsung Galaxy S24+', 
-      width: 393, 
-      height: 852, 
-      type: 'mobile' as const, 
-      icon: Smartphone,
-      description: 'Android 6.7" display',
-      ratio: '19.5:9',
-      category: 'Android'
-    },
-    { 
-      name: 'Samsung Galaxy S24', 
-      width: 360, 
-      height: 780, 
-      type: 'mobile' as const, 
-      icon: Smartphone,
-      description: 'Android 6.2" display',
-      ratio: '19.5:9',
-      category: 'Android'
-    },
-    { 
-      name: 'Google Pixel 8 Pro', 
-      width: 412, 
-      height: 892, 
-      type: 'mobile' as const, 
-      icon: Smartphone,
-      description: 'Android 6.7" display',
-      ratio: '19.3:9',
-      category: 'Android'
-    },
-    { 
-      name: 'Google Pixel 8', 
-      width: 393, 
-      height: 852, 
-      type: 'mobile' as const, 
-      icon: Smartphone,
-      description: 'Android 6.2" display',
-      ratio: '19.5:9',
-      category: 'Android'
-    },
-    { 
-      name: 'OnePlus 12', 
-      width: 412, 
-      height: 892, 
-      type: 'mobile' as const, 
-      icon: Smartphone,
-      description: 'Android 6.8" display',
-      ratio: '19.3:9',
-      category: 'Android'
-    },
-    { 
-      name: 'Samsung Galaxy Tab S9 Ultra', 
-      width: 1024, 
-      height: 1366, 
-      type: 'tablet' as const, 
-      icon: Smartphone,
-      description: 'Android 14.6" display',
-      ratio: '4:3',
-      category: 'Android'
-    },
-    { 
-      name: 'Samsung Galaxy Tab S9+', 
-      width: 834, 
-      height: 1194, 
-      type: 'tablet' as const, 
-      icon: Smartphone,
-      description: 'Android 12.4" display',
-      ratio: '4:3',
-      category: 'Android'
-    },
-    { 
-      name: 'Samsung Galaxy Tab S9', 
-      width: 820, 
-      height: 1180, 
-      type: 'tablet' as const, 
-      icon: Smartphone,
-      description: 'Android 11" display',
-      ratio: '4:3',
-      category: 'Android'
-    },
-    
-    // Desktop & Custom
-    { 
-      name: 'Desktop', 
-      width: 1440, 
-      height: 900, 
-      type: 'desktop' as const, 
-      icon: Smartphone,
-      description: 'Standard desktop',
-      ratio: '16:10',
-      category: 'Desktop'
-    },
-    { 
-      name: 'Large Desktop', 
-      width: 1920, 
-      height: 1080, 
-      type: 'desktop' as const, 
-      icon: Smartphone,
-      description: 'Full HD desktop',
-      ratio: '16:9',
-      category: 'Desktop'
-    },
-    { 
-      name: 'Ultra Wide', 
-      width: 2560, 
-      height: 1080, 
-      type: 'desktop' as const, 
-      icon: Smartphone,
-      description: 'Ultra-wide desktop',
-      ratio: '21:9',
-      category: 'Desktop'
-    },
-    { 
-      name: 'Custom', 
-      width: 400, 
-      height: 600, 
-      type: 'custom' as const, 
-      icon: Square,
-      description: 'Custom dimensions',
-      ratio: '2:3',
-      category: 'Custom'
-    }
-  ]
-
-  // Keyboard shortcuts for mode switching
-  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Handle keyboard shortcuts
-      if (e.ctrlKey || e.metaKey) {
-        switch (e.key) {
-          case 's':
-            e.preventDefault()
-            console.log('Ctrl+S pressed - saving project')
-            manualSave()
-            break
-          case 'z':
-            e.preventDefault()
-            // TODO: Implement undo
-            console.log('Undo')
-            break
-          case 'y':
-            e.preventDefault()
-            // TODO: Implement redo
-            console.log('Redo')
-            break
-          case 'Delete':
-          case 'Backspace':
-            e.preventDefault()
-            if (selectedComponentData) {
-              deleteSelectedComponent()
-            }
-            break
-        }
-      } else {
-        switch (e.key) {
-          case 'Delete':
-          case 'Backspace':
+      // Enable temporary hand tool with space key
+      if (e.code === 'Space' && !isTypingTarget(e.target) && !isPanning && !isDraggingScreen) {
         e.preventDefault()
-            if (selectedComponentData) {
-        deleteSelectedComponent()
-      }
-            break
-          case 'Escape':
-        e.preventDefault()
-        setSelectedComponent(null)
-            break
-          case 'Home':
-          e.preventDefault()
-        resetPan()
-            break
+        if (!isSpacePressedRef.current) {
+          isSpacePressedRef.current = true
+          if (activeTool !== 'hand') {
+            previousToolRef.current = activeTool
+            setActiveTool('hand')
+          }
         }
+        document.body.style.cursor = 'grab'
       }
     }
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedComponent, selectedComponentData, manualSave])
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        isSpacePressedRef.current = false
+        document.body.style.cursor = 'default'
+        if (previousToolRef.current && activeTool === 'hand') {
+          setActiveTool(previousToolRef.current)
+        }
+        previousToolRef.current = null
+      }
+    }
 
-  // Fast responsive zoom and pan
-  useEffect(() => {
     const handleWheel = (e: WheelEvent) => {
-      e.preventDefault()
-      e.stopPropagation()
-      
-      // Get mouse position relative to canvas
-      const canvasContainer = containerRef.current
-      if (!canvasContainer) return
-      
-      const canvasRect = canvasContainer.getBoundingClientRect()
-      const mouseX = e.clientX - canvasRect.left
-      const mouseY = e.clientY - canvasRect.top
-      
-      // Zoom only with Ctrl/Cmd + scroll (explicit zoom gesture)
       if (e.ctrlKey || e.metaKey) {
-        // More responsive zoom factor
-        const zoomFactor = e.deltaY > 0 ? 0.85 : 1.15
-        const newZoom = Math.max(0.1, Math.min(5, zoom * zoomFactor))
-        
-        // Calculate zoom center point
-        const zoomCenterX = (mouseX - pan.x) / zoom
-        const zoomCenterY = (mouseY - pan.y) / zoom
-        
-        // Calculate new pan to keep zoom center fixed
-        const newPanX = mouseX - zoomCenterX * newZoom
-        const newPanY = mouseY - zoomCenterY * newZoom
-        
-        // Immediate update for responsiveness
-        setZoom(newZoom)
-        setPan({
-          x: newPanX,
-          y: newPanY
-        })
-        
+            e.preventDefault()
+        const delta = e.deltaY > 0 ? 0.9 : 1.1
+        setZoom(prev => Math.min(Math.max(prev * delta, 0.1), 3))
       } else {
-        // Fast trackpad panning (two-finger scroll) - always pan, never zoom
-        const panSpeed = 1.5 // Increased for faster movement
+        e.preventDefault()
         setPan(prev => ({
-          x: prev.x - e.deltaX * panSpeed,
-          y: prev.y - e.deltaY * panSpeed
+          x: prev.x - e.deltaX,
+          y: prev.y - e.deltaY
         }))
       }
     }
 
-    const container = containerRef.current
-    if (container) {
-      container.addEventListener('wheel', handleWheel, { passive: false })
-      return () => container.removeEventListener('wheel', handleWheel)
-    }
-  }, [zoom, pan])
-
-  // Global mouse move for panning
-  useEffect(() => {
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      // Handle canvas panning
-      if (isPanning) {
-        e.preventDefault()
-        const newPanX = e.clientX - panStart.x
-        const newPanY = e.clientY - panStart.y
-        setPan({
-          x: newPanX,
-          y: newPanY
-        })
-      }
+    const handleMouseDown = (e: MouseEvent) => {
+      // Don't start panning if we're dragging a screen
+      if (isDraggingScreen) return
       
-      // Handle screen dragging
-      if (draggedScreen && screenDragOffset) {
-        // Get the canvas container to calculate proper coordinates
-        const canvasContainer = containerRef.current
-        if (canvasContainer) {
-          const canvasRect = canvasContainer.getBoundingClientRect()
-          
-          // Calculate mouse position relative to canvas, accounting for zoom and pan
-          const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
-          const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
-          
-          // Calculate new screen position by subtracting the offset from the mouse position
-          const newX = mouseX - screenDragOffset.x
-          const newY = mouseY - screenDragOffset.y
-          
-          // Get the default position for this screen using the helper function
-          const index = screens.findIndex(s => s.id === draggedScreen)
-          const screen = screens[index]
-          const { defaultX, defaultY } = calculateScreenPosition(index, screen)
-          
-          // Calculate the relative position (subtract default position)
-          const relativeX = newX - defaultX
-          const relativeY = newY - defaultY
-          
-          // Add some smoothing to prevent jumping
-          const currentPos = screenPositions[draggedScreen] || { x: 0, y: 0 }
-          const smoothFactor = 0.8 // Adjust this for more or less smoothing
-          
-          const newPosition = {
-            x: currentPos.x * smoothFactor + relativeX * (1 - smoothFactor),
-            y: currentPos.y * smoothFactor + relativeY * (1 - smoothFactor)
-          }
-          
-          updateScreenPosition(draggedScreen, newPosition)
-        }
-        
+      if (
+        e.button === 1 ||
+        (e.button === 0 && (e.altKey || activeTool === 'hand' || e.target === canvasRef.current))
+      ) {
+      e.preventDefault()
+        setIsPanning(true)
+        setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y })
         document.body.style.cursor = 'grabbing'
       }
-      
-      // Handle component dragging within screen
-      if (isDragging && selectedComponent && selectedComponentData) {
-        console.log('Mouse move while dragging')
-        
-        const activeScreenElement = document.querySelector(`[data-screen-id="${activeScreen}"]`) as HTMLElement
-        if (activeScreenElement) {
-          const screenContentElement = activeScreenElement.querySelector('.relative.w-full.h-full') as HTMLElement
-          if (screenContentElement) {
-            // Get the canvas container that has the zoom and pan transformations
-            const canvasContainer = document.querySelector('.absolute.inset-0') as HTMLElement
-            if (canvasContainer) {
-              const canvasRect = canvasContainer.getBoundingClientRect()
-              // const screenRect = screenContentElement.getBoundingClientRect()
-              
-              // Calculate the mouse position relative to the screen content, accounting for zoom and pan
-              const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
-              const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
-              
-              // Calculate the screen's position within the canvas
-              const currentScreen = screens.find(s => s.id === activeScreen)
-              const screenIndex = screens.findIndex(s => s.id === activeScreen)
-              const screenPosition = screenPositions[activeScreen!] || { x: 0, y: 0 }
-              
-              // Calculate grid position using the helper function
-              const { defaultX, defaultY } = calculateScreenPosition(screenIndex, currentScreen!)
-              const screenLeft = defaultX + screenPosition.x
-              const screenTop = defaultY + screenPosition.y
-              
-              // Calculate new component position relative to the screen
-              const newX = mouseX - screenLeft - dragOffset.x
-              const newY = mouseY - screenTop - dragOffset.y
-              
-              // Constrain to screen bounds
-              const constrainedX = Math.max(0, Math.min(newX, (currentScreen?.width || 400) - selectedComponent.size.width))
-              const constrainedY = Math.max(0, Math.min(newY, (currentScreen?.height || 600) - selectedComponent.size.height))
-              
-              console.log('Dragging component to:', { x: constrainedX, y: constrainedY })
-              
-              updateComponentLocal(selectedComponent.id, {
-                position: { x: constrainedX, y: constrainedY }
-              })
-            }
-          }
-        }
-      }
-      
-      // Handle component resizing
-      if (isResizing && selectedComponent && resizeHandle) {
-        const activeScreenElement = document.querySelector(`[data-screen-id="${activeScreen}"]`) as HTMLElement
-        if (activeScreenElement) {
-          const screenContentElement = activeScreenElement.querySelector('.relative.w-full.h-full') as HTMLElement
-          if (screenContentElement) {
-            const canvasContainer = document.querySelector('.absolute.inset-0') as HTMLElement
-            if (canvasContainer) {
-              const canvasRect = canvasContainer.getBoundingClientRect()
-              
-              // Calculate the mouse position relative to the screen content, accounting for zoom and pan
-              const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
-              const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
-              
-              // Calculate the screen's position within the canvas
-              const currentScreen = screens.find(s => s.id === activeScreen)
-              const screenIndex = screens.findIndex(s => s.id === activeScreen)
-              const screenPosition = screenPositions[activeScreen!] || { x: 0, y: 0 }
-              
-              // Calculate grid position using the helper function
-              const { defaultX, defaultY } = calculateScreenPosition(screenIndex, currentScreen!)
-              const screenLeft = defaultX + screenPosition.x
-              const screenTop = defaultY + screenPosition.y
-              
-              // Calculate new size and position based on resize handle
-              let newWidth = selectedComponent.size.width
-              let newHeight = selectedComponent.size.height
-              let newX = selectedComponent.position.x
-              let newY = selectedComponent.position.y
-              
-              const minWidth = 50
-              const minHeight = 30
-              
-              if (resizeHandle.includes('e')) {
-                newWidth = Math.max(minWidth, mouseX - screenLeft - selectedComponent.position.x)
-              }
-              if (resizeHandle.includes('w')) {
-                const rightEdge = selectedComponent.position.x + selectedComponent.size.width
-                newWidth = Math.max(minWidth, rightEdge - (mouseX - screenLeft))
-                newX = rightEdge - newWidth
-              }
-              if (resizeHandle.includes('s')) {
-                newHeight = Math.max(minHeight, mouseY - screenTop - selectedComponent.position.y)
-              }
-              if (resizeHandle.includes('n')) {
-                const bottomEdge = selectedComponent.position.y + selectedComponent.size.height
-                newHeight = Math.max(minHeight, bottomEdge - (mouseY - screenTop))
-                newY = bottomEdge - newHeight
-              }
-              
-              // Constrain to screen bounds (allow resizing all the way to the edge)
-              if (currentScreen) {
-                // Clamp width/height so the component doesn't go outside the screen
-                newWidth = Math.min(newWidth, currentScreen.width - newX);
-                newHeight = Math.min(newHeight, currentScreen.height - newY);
-                // Clamp position so the component doesn't go outside the screen
-                newX = Math.max(0, Math.min(newX, currentScreen.width - newWidth));
-                newY = Math.max(0, Math.min(newY, currentScreen.height - newHeight));
-              }
-              
-              updateComponentLocal(selectedComponent.id, {
-                position: { x: newX, y: newY },
-                size: { width: newWidth, height: newHeight }
-              })
-            }
-          }
-        }
-      }
     }
 
-    const handleGlobalMouseUp = () => {
+    const handleMouseMove = (e: MouseEvent) => {
       if (isPanning) {
-        setIsPanning(false)
-        document.body.style.cursor = 'default'
-      }
-      if (draggedScreen) {
-        setDraggedScreen(null)
-        setScreenDragOffset({ x: 0, y: 0 })
-        document.body.style.cursor = 'default'
-      }
-      if (isDragging) {
-        setIsDragging(false)
-        setSelectedComponent(null)
-        document.body.style.cursor = 'default'
-      }
-      if (isResizing) {
-        setIsResizing(false)
-        setResizeHandle(null)
-        document.body.style.cursor = 'default'
-      }
-    }
-
-    if (isPanning || draggedScreen) {
-      document.addEventListener('mousemove', handleGlobalMouseMove, { passive: false })
-      document.addEventListener('mouseup', handleGlobalMouseUp)
-      if (isPanning) document.body.style.cursor = 'grabbing'
-      if (draggedScreen) document.body.style.cursor = 'grabbing'
-      return () => {
-        document.removeEventListener('mousemove', handleGlobalMouseMove)
-        document.removeEventListener('mouseup', handleGlobalMouseUp)
-        document.body.style.cursor = 'default'
-      }
-    }
-  }, [isPanning, panStart, draggedScreen, screenDragOffset, pan, zoom, isDragging, selectedComponent, selectedComponentData, dragOffset, isResizing, resizeHandle, activeScreen, screens, screenPositions])
-
-
-
-
-
-  // const addVariable = () => {
-  //   const newVariable: Variable = {
-  //     id: Date.now().toString(),
-  //     name: `Variable ${variables.length + 1}`,
-  //     type: 'string',
-  //     value: '',
-  //     scope: 'global'
-  //   }
-  //   setVariables(prev => [...prev, newVariable])
-  // }
-
-  // const deleteVariable = (variableId: string) => {
-  //   setVariables(prev => prev.filter(v => v.id !== variableId))
-  // }
-
-  // const updateVariable = (variableId: string, updates: Partial<Variable>) => {
-  //   setVariables(prev => prev.map(v => v.id === variableId ? { ...v, ...updates } : v))
-  // }
-
-  // Interaction management functions
-  const addClickEvent = (componentId: string) => {
-    updateComponentLocal(componentId, {
-      interactions: {
-        ...selectedComponentData?.interactions,
-        click: 'handle_click'
-      }
-    })
-  }
-
-  const addHoverEffect = (componentId: string) => {
-    updateComponentLocal(componentId, {
-      interactions: {
-        ...selectedComponentData?.interactions,
-        hover: 'scale'
-      }
-    })
-  }
-
-  const addAnimation = (componentId: string) => {
-    updateComponentLocal(componentId, {
-      interactions: {
-        ...selectedComponentData?.interactions,
-        animation: 'fadeIn'
-      }
-    })
-  }
-
-  const removeInteraction = (componentId: string, interactionType: 'click' | 'hover' | 'animation') => {
-    const updatedInteractions = { ...selectedComponentData?.interactions }
-    delete updatedInteractions[interactionType]
-    updateComponentLocal(componentId, { interactions: updatedInteractions })
-  }
-
-  // Data binding functions
-  const bindToVariable = (componentId: string) => {
-    updateComponentLocal(componentId, {
-      dataBinding: {
-        ...selectedComponentData?.dataBinding,
-        variable: 'data_variable'
-      }
-    })
-  }
-
-  const connectToAPI = (componentId: string) => {
-    updateComponentLocal(componentId, {
-      dataBinding: {
-        ...selectedComponentData?.dataBinding,
-        api: 'https://api.example.com/data'
-      }
-    })
-  }
-
-  const removeDataBinding = (componentId: string, bindingType: 'variable' | 'api') => {
-    const updatedDataBinding = { ...selectedComponentData?.dataBinding }
-    delete updatedDataBinding[bindingType]
-    updateComponentLocal(componentId, { dataBinding: updatedDataBinding })
-  }
-
-  // Mouse event handlers for dragging
-  const handleMouseDown = (e: React.MouseEvent, component: Component) => {
-    console.log('Mouse down on component:', component.name, component.id)
-    e.stopPropagation()
-    setSelectedComponent(component)
-    
-    // Get the canvas container (same as handleMouseMove)
-    const canvasContainer = containerRef.current
-    if (!canvasContainer) return
-    
-      const canvasRect = canvasContainer.getBoundingClientRect()
-      
-      // Calculate the mouse position relative to the canvas, accounting for zoom and pan
-      const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
-      const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
-      
-    // Get the active screen
-      const currentScreen = screens.find(s => s.id === activeScreen)
-    if (!currentScreen) return
-    
-      const screenIndex = screens.findIndex(s => s.id === activeScreen)
-      const screenPosition = screenPositions[activeScreen!] || { x: 0, y: 0 }
-      
-    // Calculate screen position in canvas coordinates
-    const { defaultX, defaultY } = calculateScreenPosition(screenIndex, currentScreen)
-      const screenLeft = defaultX + screenPosition.x
-      const screenTop = defaultY + screenPosition.y
-      
-      // Calculate offset from mouse to component position
-      const offsetX = mouseX - screenLeft - component.position.x
-      const offsetY = mouseY - screenTop - component.position.y
-      
-      setDragOffset({ x: offsetX, y: offsetY })
-      setIsDragging(true)
-      console.log('Drag started - offset:', { x: offsetX, y: offsetY })
-
-      // Set up cross-screen dragging after a short delay
-      const crossScreenTimer = setTimeout(() => {
-        if (isDragging) {
-          setIsDraggingComponent(true)
-          setDraggedComponent(component)
-          setSourceScreenId(activeScreen)
-          setSourceLayerId(currentScreen?.activeLayer || null)
-          console.log('Cross-screen dragging enabled for component:', component.id)
-        }
-      }, 300) // 300ms delay to distinguish from regular dragging
-
-      // Store timer reference to clear it if mouse up happens before delay
-      const handleMouseUpEarly = () => {
-        clearTimeout(crossScreenTimer)
-        document.removeEventListener('mouseup', handleMouseUpEarly)
-      }
-      document.addEventListener('mouseup', handleMouseUpEarly, { once: true })
-  }
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (isDragging && selectedComponent && selectedComponentData) {
-      console.log('Mouse move while dragging')
-      
-      // Get the canvas container
-      const canvasContainer = containerRef.current
-      if (!canvasContainer) return
-      
-            const canvasRect = canvasContainer.getBoundingClientRect()
-            
-      // Calculate mouse position relative to canvas, accounting for zoom and pan
-            const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
-            const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
-            
-      // Get the active screen
-            const currentScreen = screens.find(s => s.id === activeScreen)
-      if (!currentScreen) return
-      
-            const screenIndex = screens.findIndex(s => s.id === activeScreen)
-            const screenPosition = screenPositions[activeScreen!] || { x: 0, y: 0 }
-            
-      // Calculate screen position in canvas coordinates
-      const { defaultX, defaultY } = calculateScreenPosition(screenIndex, currentScreen)
-            const screenLeft = defaultX + screenPosition.x
-            const screenTop = defaultY + screenPosition.y
-            
-      // Calculate new component position relative to screen
-            const newX = mouseX - screenLeft - dragOffset.x
-            const newY = mouseY - screenTop - dragOffset.y
-            
-            // Constrain to screen bounds
-      const constrainedX = Math.max(0, Math.min(newX, currentScreen.width - selectedComponent.size.width))
-      const constrainedY = Math.max(0, Math.min(newY, currentScreen.height - selectedComponent.size.height))
-            
-            console.log('Dragging component to:', { x: constrainedX, y: constrainedY })
-            
-      // Update component position immediately
-            updateComponentLocal(selectedComponent.id, {
-              position: { x: constrainedX, y: constrainedY }
-            })
-    }
-  }
-
-  const handleMouseUp = () => {
-    if (isDragging) {
-      console.log('Mouse up - drag ended')
-      
-      // Trigger save when component drag ends
-      if (projectId && selectedComponent) {
-        console.log('Component moved, triggering save...')
-        setTimeout(() => {
-          if (!isSaving && !isLoadingData) {
-            saveProjectData()
-          }
-        }, 2000) // 2 second delay to prevent rapid saves
-      }
-    }
-    if (isDraggingComponent) {
-      console.log('Cross-screen drag ended')
-      setIsDraggingComponent(false)
-      setDraggedComponent(null)
-      setSourceScreenId(null)
-      setSourceLayerId(null)
-    }
-    setIsDragging(false)
-  }
-
-  // Add document-level event listeners for dragging and resizing
-  useEffect(() => {
-    if (isDragging || isResizing) {
-      document.addEventListener('mousemove', isDragging ? handleMouseMove : handleResizeMove)
-      document.addEventListener('mouseup', isDragging ? handleMouseUp : handleResizeEnd)
-      
-      return () => {
-        document.removeEventListener('mousemove', isDragging ? handleMouseMove : handleResizeMove)
-        document.removeEventListener('mouseup', isDragging ? handleMouseUp : handleResizeEnd)
-      }
-    }
-  }, [isDragging, isResizing, selectedComponent, dragOffset, zoom, pan, activeScreen, resizeHandle, resizeStartPos, resizeStartSize])
-
-  const handleCanvasClick = (e: React.MouseEvent) => {
-    // Only deselect if clicking on canvas background and not dragging
-    if (e.target === e.currentTarget && !isDragging) {
-    setSelectedComponent(null)
-    }
-  }
-
-  // Fast mouse panning functionality
-  const handleMouseDownPan = (e: React.MouseEvent) => {
-    e.preventDefault()
-    setIsPanning(true)
-      setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y })
-    document.body.style.cursor = 'grabbing'
-  }
-
-  const handleMouseMovePan = (e: React.MouseEvent) => {
-    if (isPanning) {
-    e.preventDefault()
-      const newPanX = e.clientX - panStart.x
-      const newPanY = e.clientY - panStart.y
-      setPan({
-        x: newPanX,
-        y: newPanY
-      })
-    }
-  }
-
-  const handleMouseUpPan = () => {
-    setIsPanning(false)
-    document.body.style.cursor = 'default'
-  }
-
-  const handleMouseEnter = () => {
-    if (isPanning) {
-      document.body.style.cursor = 'grabbing'
-    }
-  }
-
-  const handleMouseLeave = () => {
-    if (isPanning) {
-      setIsPanning(false)
-      document.body.style.cursor = 'default'
-    }
-  }
-
-
-  // Screen dragging handlers
-  const handleScreenMouseDown = (e: React.MouseEvent, screenId: string) => {
-    e.stopPropagation()
-    setDraggedScreen(screenId)
-    
-    // Get the canvas container to calculate offset relative to its actual visual position
-    const canvasContainer = containerRef.current
-    if (canvasContainer) {
-      const canvasRect = canvasContainer.getBoundingClientRect()
-      
-      // Calculate the screen's current position in canvas coordinates
-      const index = screens.findIndex(s => s.id === screenId)
-      const screen = screens[index]
-      const { defaultX, defaultY } = calculateScreenPosition(index, screen)
-      const screenPosition = screenPositions[screenId] || { x: 0, y: 0 }
-      const currentScreenX = defaultX + screenPosition.x
-      const currentScreenY = defaultY + screenPosition.y
-      
-      // Calculate offset from mouse to the screen's top-left corner in canvas coordinates
-      const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
-      const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
-      const offsetX = mouseX - currentScreenX
-      const offsetY = mouseY - currentScreenY
-      
-      setScreenDragOffset({ x: offsetX, y: offsetY })
-    }
-  }
-
-  // const handleScreenMouseMove = (e: React.MouseEvent) => {
-  //   if (draggedScreen) {
-  //     // Get the canvas container to calculate proper coordinates (same as global mouse move)
-  //     const canvasContainer = document.querySelector('.absolute') as HTMLElement
-  //     if (canvasContainer) {
-  //       const canvasRect = canvasContainer.getBoundingClientRect()
-  //       
-  //       // Calculate mouse position relative to canvas, accounting for zoom and pan (same as global mouse move)
-  //       const mouseX = (e.clientX - canvasRect.left - pan.x) / zoom
-  //       const mouseY = (e.clientY - canvasRect.top - pan.y) / zoom
-  //       
-  //       // Calculate new screen position
-  //       const newX = mouseX - screenDragOffset.x
-  //       const newY = mouseY - screenDragOffset.y
-  //       
-  //       // Get the default position for this screen using the helper function
-  //       const index = screens.findIndex(s => s.id === draggedScreen)
-  //       const screen = screens[index]
-  //       const { defaultX, defaultY } = calculateScreenPosition(index, screen)
-  //       
-  //       // Calculate the relative position (subtract default position)
-  //       const relativeX = newX - defaultX
-  //       const relativeY = newY - defaultY
-  //       
-  //       setScreenPositions(prev => ({
-  //         ...prev,
-  //         [draggedScreen]: { x: relativeX, y: relativeY }
-  //       }))
-  //     }
-  //   }
-  // }
-
-  // const handleScreenMouseUp = () => {
-  // setDraggedScreen(null)
-  // setScreenDragOffset({ x: 0, y: 0 })
-// }
-
-  const renderComponent = (component: Component) => {
-    const baseStyle = {
-      backgroundColor: component.backgroundColor || 'white'
-    }
-    
-    switch (component.type) {
-      case 'container':
-        return (
-          <div className="w-full h-full bg-gray-50 border border-gray-200 rounded-lg p-4 flex flex-col" style={baseStyle}>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold text-gray-800">Container</h3>
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-            </div>
-            <div className="flex-1 bg-white rounded border border-gray-100 p-3">
-              <p className="text-xs text-gray-600">Content area</p>
-            </div>
-          </div>
-        )
-      case 'text':
-        return (
-          <div className="w-full h-full flex flex-col justify-center p-3" style={baseStyle}>
-            <h2 className="text-lg font-bold text-gray-900 mb-2">
-              {component.props?.heading || 'Heading Text'}
-            </h2>
-            <p className="text-sm text-gray-600 leading-relaxed">
-              {component.props?.content || 'This is a paragraph of text that demonstrates how text content would appear in your application.'}
-            </p>
-          </div>
-        )
-      case 'button':
-        return (
-          <div className="w-full h-full flex items-center justify-center p-3" style={baseStyle}>
-            <button className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg shadow-sm transition-colors duration-200">
-              {component.props?.text || 'Click Me'}
-            </button>
-          </div>
-        )
-      case 'input':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex flex-col justify-center">
-            <div className="w-1/2 h-1 bg-gray-300 rounded mb-1"></div>
-            <div className="w-full h-4 bg-white border border-gray-300 rounded-md"></div>
-          </div>
-        )
-      case 'image':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-blue-400 to-purple-500 rounded-lg flex items-center justify-center">
-              <div className="w-6 h-6 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        )
-      case 'form':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex flex-col justify-center">
-            <div className="w-2/3 h-1 bg-gray-300 rounded mb-1"></div>
-            <div className="w-full h-3 bg-white border border-gray-300 rounded mb-1"></div>
-            <div className="w-full h-3 bg-white border border-gray-300 rounded mb-1"></div>
-            <div className="w-full h-4 bg-gradient-to-r from-blue-500 to-blue-600 rounded"></div>
-          </div>
-        )
-      case 'list':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex flex-col justify-center">
-            <div className="w-1/2 h-1 bg-gray-300 rounded mb-1"></div>
-            <div className="space-y-1">
-              <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 border border-gray-400 rounded"></div>
-                <div className="w-8 h-1 bg-gray-200 rounded"></div>
-              </div>
-              <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 border border-gray-400 rounded"></div>
-                <div className="w-6 h-1 bg-gray-200 rounded"></div>
-              </div>
-              <div className="flex items-center space-x-1">
-                <div className="w-2 h-2 border border-gray-400 rounded"></div>
-                <div className="w-7 h-1 bg-gray-200 rounded"></div>
-              </div>
-            </div>
-          </div>
-        )
-      case 'table':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex flex-col justify-center">
-            <div className="w-full h-3 bg-gray-300 rounded mb-1"></div>
-            <div className="w-full h-2 bg-gray-200 rounded mb-1"></div>
-            <div className="w-full h-2 bg-gray-200 rounded mb-1"></div>
-            <div className="w-full h-2 bg-gray-200 rounded"></div>
-          </div>
-        )
-      case 'chart':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-white rounded border border-gray-200 p-1">
-              <div className="w-full h-full flex items-end justify-center space-x-1">
-                <div className="w-2 bg-blue-500 rounded-t" style={{ height: '60%' }}></div>
-                <div className="w-2 bg-green-500 rounded-t" style={{ height: '80%' }}></div>
-                <div className="w-2 bg-purple-500 rounded-t" style={{ height: '40%' }}></div>
-                <div className="w-2 bg-orange-500 rounded-t" style={{ height: '70%' }}></div>
-              </div>
-            </div>
-          </div>
-        )
-      case 'map':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center">
-              <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-            </div>
-          </div>
-        )
-      case 'video':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-red-400 to-red-500 rounded-lg flex items-center justify-center">
-              <div className="w-6 h-6 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        )
-      case 'audio':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-green-400 to-green-500 rounded-lg flex items-center justify-center">
-              <div className="w-6 h-6 bg-white bg-opacity-20 rounded-full flex items-center justify-center">
-                <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.794L4.383 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.383l4.617-3.794a1 1 0 011.383.07zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        )
-      case 'canvas':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-white border border-gray-300 rounded flex items-center justify-center">
-              <div className="w-4 h-4 bg-gradient-to-br from-yellow-400 to-orange-500 rounded"></div>
-            </div>
-          </div>
-        )
-      case 'svg':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-white border border-gray-300 rounded flex items-center justify-center">
-              <svg className="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-          </div>
-        )
-      case 'webgl':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-purple-900 rounded flex items-center justify-center">
-              <div className="w-4 h-4 bg-gradient-to-br from-blue-400 to-purple-400 rounded transform rotate-45"></div>
-            </div>
-          </div>
-        )
-      case 'vr':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-gray-800 to-black rounded flex items-center justify-center">
-              <div className="w-6 h-4 bg-gray-600 rounded-full"></div>
-            </div>
-          </div>
-        )
-      case 'ar':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-blue-900 to-indigo-900 rounded flex items-center justify-center">
-              <div className="w-5 h-5 border-2 border-blue-400 rounded-full"></div>
-            </div>
-          </div>
-        )
-      case '3d':
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white p-2 flex items-center justify-center">
-            <div className="w-full h-full bg-gradient-to-br from-gray-800 to-black rounded flex items-center justify-center">
-              <div className="w-4 h-4 bg-gradient-to-br from-red-500 to-pink-500 transform rotate-45"></div>
-            </div>
-          </div>
-        )
-      default:
-        return (
-          <div className="w-full h-full bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
-            <div className="w-4 h-4 bg-gray-400 rounded"></div>
-          </div>
-        )
-    }
-  }
-
-  // Pre-built mobile page functions
-  const addLoginPage = () => {
-    if (!currentScreen) return
-
-    const loginComponents: Component[] = [
-      {
-        id: Date.now().toString() + '_email_input',
-        type: 'input',
-        name: 'Email',
-        props: {},
-        position: { x: 50, y: 200 },
-        size: { width: 300, height: 50 },
-        backgroundColor: '#f8f9fa',
-        interactions: {
-          click: 'focus',
-          hover: 'highlight'
-        },
-        dataBinding: {
-          variable: 'userEmail'
-        }
-      },
-      {
-        id: Date.now().toString() + '_password_input',
-        type: 'input',
-        name: 'Password',
-        props: {},
-        position: { x: 50, y: 270 },
-        size: { width: 300, height: 50 },
-        backgroundColor: '#f8f9fa',
-        interactions: {
-          click: 'focus',
-          hover: 'highlight'
-        },
-        dataBinding: {
-          variable: 'userPassword'
-        }
-      },
-      {
-        id: Date.now().toString() + '_login_button',
-        type: 'button',
-        name: 'Login',
-        props: {},
-        position: { x: 50, y: 340 },
-        size: { width: 300, height: 50 },
-        backgroundColor: '#3b82f6',
-        interactions: {
-          click: 'submit_login',
-          hover: 'scale'
-        },
-        dataBinding: {
-          api: 'https://api.example.com/auth/login'
-        }
-      }
-    ]
-
-    // Add each component to the context first
-    loginComponents.forEach(comp => {
-      addComponent(comp)
-    })
-
-    // Update the current layer
-    updateScreen(activeScreen!, {
-      layers: currentScreen.layers.map(layer => 
-        layer.id === currentScreen.activeLayer 
-          ? { ...layer, components: [...layer.components, ...loginComponents] }
-          : layer
-      )
-    })
-  }
-
-  const addDashboardPage = () => {
-    if (!currentScreen) return
-
-    const dashboardComponents: Component[] = [
-      {
-        id: Date.now().toString() + '_header',
-        type: 'text',
-        name: 'Dashboard',
-        props: {},
-        position: { x: 30, y: 60 },
-        size: { width: 200, height: 40 },
-        backgroundColor: '#ffffff'
-      },
-      {
-        id: Date.now().toString() + '_profile_avatar',
-        type: 'image',
-        name: 'Profile Avatar',
-        props: {},
-        position: { x: 320, y: 60 },
-        size: { width: 50, height: 50 },
-        backgroundColor: '#e5e7eb',
-        interactions: {
-          click: 'open_profile_menu',
-          hover: 'scale'
-        }
-      },
-      {
-        id: Date.now().toString() + '_stats_card1',
-        type: 'container',
-        name: 'Total Users',
-        props: {},
-        position: { x: 30, y: 130 },
-        size: { width: 160, height: 100 },
-        backgroundColor: '#f0f9ff',
-        interactions: {
-          hover: 'shadow'
-        },
-        dataBinding: {
-          variable: 'totalUsers'
-        }
-      },
-      {
-        id: Date.now().toString() + '_stats_card2',
-        type: 'container',
-        name: 'Active Sessions',
-        props: {},
-        position: { x: 210, y: 130 },
-        size: { width: 160, height: 100 },
-        backgroundColor: '#f0fdf4',
-        interactions: {
-          hover: 'shadow'
-        },
-        dataBinding: {
-          variable: 'activeSessions'
-        }
-      },
-      {
-        id: Date.now().toString() + '_chart_container',
-        type: 'chart',
-        name: 'Analytics Chart',
-        props: {},
-        position: { x: 30, y: 250 },
-        size: { width: 340, height: 200 },
-        backgroundColor: '#ffffff',
-        interactions: {
-          hover: 'highlight'
-        },
-        dataBinding: {
-          api: 'https://api.example.com/analytics/chart-data'
-        }
-      },
-      {
-        id: Date.now().toString() + '_recent_activity',
-        type: 'list',
-        name: 'Recent Activity',
-        props: {},
-        position: { x: 30, y: 470 },
-        size: { width: 340, height: 150 },
-        backgroundColor: '#ffffff',
-        interactions: {
-          hover: 'highlight'
-        },
-        dataBinding: {
-          api: 'https://api.example.com/activity/recent'
-        }
-      },
-      {
-        id: Date.now().toString() + '_quick_action1',
-        type: 'button',
-        name: 'Add User',
-        props: {},
-        position: { x: 30, y: 640 },
-        size: { width: 160, height: 50 },
-        backgroundColor: '#3b82f6',
-        interactions: {
-          click: 'open_add_user_modal',
-          hover: 'scale'
-        }
-      },
-      {
-        id: Date.now().toString() + '_quick_action2',
-        type: 'button',
-        name: 'Generate Report',
-        props: {},
-        position: { x: 210, y: 640 },
-        size: { width: 160, height: 50 },
-        backgroundColor: '#10b981',
-        interactions: {
-          click: 'generate_report',
-          hover: 'scale'
-        }
-      }
-    ]
-
-    // Add components to context
-    dashboardComponents.forEach(comp => addComponent(comp))
-
-    // Update the current layer
-    updateScreen(activeScreen!, {
-      layers: currentScreen.layers.map(layer => 
-        layer.id === currentScreen.activeLayer 
-          ? { ...layer, components: [...layer.components, ...dashboardComponents] }
-          : layer
-      )
-    })
-  }
-
-  const addProfilePage = () => {
-    if (!currentScreen) return
-
-    const profileComponents: Component[] = [
-      // Header background
-      {
-        id: Date.now().toString() + '_profile_header_bg',
-        type: 'container',
-        name: 'HeaderBG',
-        props: {},
-        position: { x: 0, y: 0 },
-        size: { width: 400, height: 120 },
-        backgroundColor: '#2563eb',
-      },
-      // Profile photo (centered, overlapping header)
-      {
-        id: Date.now().toString() + '_profile_photo',
-        type: 'image',
-        name: 'Profile Photo',
-        props: {},
-        position: { x: 140, y: 60 },
-        size: { width: 120, height: 120 },
-        backgroundColor: '#e5e7eb',
-        interactions: {
-          click: 'change_profile_photo',
-          hover: 'scale',
-        },
-        dataBinding: {
-          variable: 'profilePhoto',
-      },
-      },
-      // Edit Photo button (below photo)
-      {
-        id: Date.now().toString() + '_edit_photo',
-        type: 'button',
-        name: 'Edit Photo',
-        props: {},
-        position: { x: 160, y: 190 },
-        size: { width: 80, height: 32 },
-        backgroundColor: '#3b82f6',
-        interactions: {
-          click: 'open_photo_picker',
-          hover: 'scale',
-      },
-      },
-      // Name label
-      {
-        id: Date.now().toString() + '_name_label',
-        type: 'text',
-        name: 'Full Name',
-        props: {},
-        position: { x: 40, y: 240 },
-        size: { width: 100, height: 20 },
-        backgroundColor: '#ffffff',
-      },
-      // Name input
-      {
-        id: Date.now().toString() + '_name_input',
-        type: 'input',
-        name: 'NameInput',
-        props: { placeholder: 'Enter your name' },
-        position: { x: 160, y: 235 },
-        size: { width: 200, height: 32 },
-        backgroundColor: '#f3f4f6',
-        dataBinding: {
-          variable: 'fullName',
-      },
-      },
-      // Email label
-      {
-        id: Date.now().toString() + '_email_label',
-        type: 'text',
-        name: 'Email',
-        props: {},
-        position: { x: 40, y: 280 },
-        size: { width: 100, height: 20 },
-        backgroundColor: '#ffffff',
-      },
-      // Email input
-      {
-        id: Date.now().toString() + '_email_input',
-        type: 'input',
-        name: 'EmailInput',
-        props: { placeholder: 'Enter your email' },
-        position: { x: 160, y: 275 },
-        size: { width: 200, height: 32 },
-        backgroundColor: '#f3f4f6',
-        dataBinding: {
-          variable: 'email',
-        },
-      },
-      // Save button
-      {
-        id: Date.now().toString() + '_save_button',
-        type: 'button',
-        name: 'Save Changes',
-        props: {},
-        position: { x: 140, y: 330 },
-        size: { width: 120, height: 40 },
-        backgroundColor: '#10b981',
-        interactions: {
-          click: 'save_profile',
-          hover: 'scale',
-        },
-      },
-    ]
-
-    // Add all components to the current screen's active layer
-    const updatedLayers = currentScreen.layers.map(layer =>
-        layer.id === currentScreen.activeLayer 
-          ? { ...layer, components: [...layer.components, ...profileComponents] }
-          : layer
-      )
-    updateScreen(currentScreen.id, { layers: updatedLayers })
-  }
-
-  const addEcommercePage = () => {
-    if (!currentScreen) return
-
-    const ecommerceComponents: Component[] = [
-      {
-        id: Date.now().toString() + '_search_header',
-        type: 'input',
-        name: 'Search Products',
-        props: {},
-        position: { x: 20, y: 60 },
-        size: { width: 360, height: 50 },
-        backgroundColor: '#f8f9fa',
-        interactions: {
-          click: 'focus',
-          hover: 'highlight'
-        }
-      },
-      {
-        id: Date.now().toString() + '_category_tabs',
-        type: 'container',
-        name: 'Categories',
-        props: {},
-        position: { x: 20, y: 130 },
-        size: { width: 360, height: 50 },
-        backgroundColor: '#ffffff',
-        interactions: {
-          hover: 'highlight'
-        }
-      },
-      {
-        id: Date.now().toString() + '_product_card1',
-        type: 'container',
-        name: 'Product Card 1',
-        props: {},
-        position: { x: 20, y: 200 },
-        size: { width: 170, height: 220 },
-        backgroundColor: '#ffffff',
-        interactions: {
-          click: 'view_product',
-          hover: 'shadow'
-        },
-        dataBinding: {
-          variable: 'product1'
-        }
-      },
-      {
-        id: Date.now().toString() + '_product_card2',
-        type: 'container',
-        name: 'Product Card 2',
-        props: {},
-        position: { x: 210, y: 200 },
-        size: { width: 170, height: 220 },
-        backgroundColor: '#ffffff',
-        interactions: {
-          click: 'view_product',
-          hover: 'shadow'
-        },
-        dataBinding: {
-          variable: 'product2'
-        }
-      },
-      {
-        id: Date.now().toString() + '_product_card3',
-        type: 'container',
-        name: 'Product Card 3',
-        props: {},
-        position: { x: 20, y: 440 },
-        size: { width: 170, height: 220 },
-        backgroundColor: '#ffffff',
-        interactions: {
-          click: 'view_product',
-          hover: 'shadow'
-        },
-        dataBinding: {
-          variable: 'product3'
-        }
-      },
-      {
-        id: Date.now().toString() + '_product_card4',
-        type: 'container',
-        name: 'Product Card 4',
-        props: {},
-        position: { x: 210, y: 440 },
-        size: { width: 170, height: 220 },
-        backgroundColor: '#ffffff',
-        interactions: {
-          click: 'view_product',
-          hover: 'shadow'
-        },
-        dataBinding: {
-          variable: 'product4'
-        }
-      },
-      {
-        id: Date.now().toString() + '_cart_button',
-        type: 'button',
-        name: '🛒 Cart (3)',
-        props: {},
-        position: { x: 20, y: 680 },
-        size: { width: 360, height: 50 },
-        backgroundColor: '#3b82f6',
-        interactions: {
-          click: 'open_cart',
-          hover: 'scale'
-        },
-        dataBinding: {
-          variable: 'cartItems'
-        }
-      }
-    ]
-
-    // Add components to context
-    ecommerceComponents.forEach(comp => addComponent(comp))
-
-    // Update the current layer
-    updateScreen(activeScreen!, {
-      layers: currentScreen.layers.map(layer => 
-        layer.id === currentScreen.activeLayer 
-          ? { ...layer, components: [...layer.components, ...ecommerceComponents] }
-          : layer
-      )
-    })
-  }
-
-  const addComponentToCanvas = (componentType: string) => {
-    if (!currentScreen || !currentLayer) {
-      console.log('No current screen or layer')
-      return
-    }
-
-    // Calculate smart position to avoid overlapping
-    const existingComponents = currentLayer.components
-    let newX = 50
-    let newY = 50
-    
-    // Find a position that doesn't overlap with existing components
-    const gridSize = 20
-    let attempts = 0
-    const maxAttempts = 100
-    
-    while (attempts < maxAttempts) {
-      let hasOverlap = false
-      
-      for (const component of existingComponents) {
-        const overlap = !(
-          newX + 200 < component.position.x ||
-          newX > component.position.x + component.size.width ||
-          newY + 100 < component.position.y ||
-          newY > component.position.y + component.size.height
-        )
-        
-        if (overlap) {
-          hasOverlap = true
-          break
-        }
-      }
-      
-      if (!hasOverlap) {
-        break
-      }
-      
-      // Try next position in a grid pattern
-      newX += gridSize
-      if (newX > (currentScreen.width || 400) - 200) {
-        newX = 50
-        newY += gridSize
-      }
-      
-      attempts++
-    }
-
-    const newComponent: Component = {
-      id: Date.now().toString(),
-      type: componentType,
-      name: `${componentType.charAt(0).toUpperCase() + componentType.slice(1)} ${Date.now()}`,
-      props: {},
-      position: { x: newX, y: newY },
-      size: { width: 200, height: 100 },
-      backgroundColor: '#ffffff',
-      zIndex: currentLayer.components.length + 1, // New components get highest z-index
-      interactions: {},
-      dataBinding: {}
-    }
-
-    console.log('Adding component at position:', { x: newX, y: newY })
-
-    // Add component to the context
-    addComponent(newComponent)
-    
-    // Update the current screen's active layer with the new component
-    const updatedLayers = currentScreen.layers.map(layer => 
-      layer.id === currentScreen.activeLayer 
-        ? { ...layer, components: [...layer.components, newComponent] }
-        : layer
-    )
-    
-    updateScreen(activeScreen!, {
-      layers: updatedLayers
-    })
-    
-    setSelectedComponent(newComponent)
-    console.log('Component added successfully')
-    
-    // Trigger save when component is added
-    if (projectId) {
-      console.log('Component added, triggering save...')
-      setTimeout(() => {
-        if (!isSaving && !isLoadingData) {
-          saveProjectData()
-        }
-      }, 5000) // 5 second delay to prevent rapid saves
-    }
-  }
-
-  // Toggle sidebar sections
-
-  // Component resize handlers
-  const handleResizeStart = (e: React.MouseEvent, component: Component, handle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w') => {
-    e.stopPropagation()
-    setResizeHandle(handle)
-    setIsResizing(true)
-    
-    const activeScreenElement = document.querySelector(`[data-screen-id="${activeScreen}"]`) as HTMLElement
-    if (activeScreenElement) {
-      const screenRect = activeScreenElement.getBoundingClientRect()
-      
-      // Calculate mouse position relative to the screen element
-      const mouseX = e.clientX - screenRect.left
-      const mouseY = e.clientY - screenRect.top
-      
-      setResizeStartPos({ x: mouseX, y: mouseY })
-      setResizeStartSize({ width: component.size.width, height: component.size.height })
-    }
-  }
-
-  const handleResizeMove = (e: MouseEvent) => {
-    if (isResizing && selectedComponent && resizeHandle) {
-      const activeScreenElement = document.querySelector(`[data-screen-id="${activeScreen}"]`) as HTMLElement
-      if (activeScreenElement) {
-        const screenRect = activeScreenElement.getBoundingClientRect()
-        
-        // Calculate mouse position relative to the screen element
-        const mouseX = e.clientX - screenRect.left
-        const mouseY = e.clientY - screenRect.top
-        
-        // Calculate deltas from the resize start position
-        const deltaX = mouseX - resizeStartPos.x
-        const deltaY = mouseY - resizeStartPos.y
-            
-            let newWidth = resizeStartSize.width
-            let newHeight = resizeStartSize.height
-            let newX = selectedComponent.position.x
-            let newY = selectedComponent.position.y
-            
-            // Calculate new size and position based on resize handle
-            switch (resizeHandle) {
-              case 'se': // bottom-right
-                newWidth = Math.max(20, resizeStartSize.width + deltaX)
-                newHeight = Math.max(20, resizeStartSize.height + deltaY)
-                break
-              case 'sw': // bottom-left
-                newWidth = Math.max(20, resizeStartSize.width - deltaX)
-                newHeight = Math.max(20, resizeStartSize.height + deltaY)
-            newX = selectedComponent.position.x + resizeStartSize.width - newWidth
-                break
-              case 'ne': // top-right
-                newWidth = Math.max(20, resizeStartSize.width + deltaX)
-                newHeight = Math.max(20, resizeStartSize.height - deltaY)
-            newY = selectedComponent.position.y + resizeStartSize.height - newHeight
-                break
-              case 'nw': // top-left
-                newWidth = Math.max(20, resizeStartSize.width - deltaX)
-                newHeight = Math.max(20, resizeStartSize.height - deltaY)
-            newX = selectedComponent.position.x + resizeStartSize.width - newWidth
-            newY = selectedComponent.position.y + resizeStartSize.height - newHeight
-                break
-              case 'e': // right
-                newWidth = Math.max(20, resizeStartSize.width + deltaX)
-                break
-              case 'w': // left
-                newWidth = Math.max(20, resizeStartSize.width - deltaX)
-            newX = selectedComponent.position.x + resizeStartSize.width - newWidth
-                break
-              case 's': // bottom
-                newHeight = Math.max(20, resizeStartSize.height + deltaY)
-                break
-              case 'n': // top
-                newHeight = Math.max(20, resizeStartSize.height - deltaY)
-            newY = selectedComponent.position.y + resizeStartSize.height - newHeight
-                break
-            }
-            
-        // Constrain to screen bounds
-        const currentScreen = screens.find(s => s.id === activeScreen)
-            if (currentScreen) {
-              // Clamp width/height so the component doesn't go outside the screen
-          newWidth = Math.min(newWidth, currentScreen.width - newX)
-          newHeight = Math.min(newHeight, currentScreen.height - newY)
-              // Clamp position so the component doesn't go outside the screen
-          newX = Math.max(0, Math.min(newX, currentScreen.width - newWidth))
-          newY = Math.max(0, Math.min(newY, currentScreen.height - newHeight))
-            }
-            
-            updateComponentLocal(selectedComponent.id, {
-              position: { x: newX, y: newY },
-              size: { width: newWidth, height: newHeight }
-            })
-      }
-    }
-  }
-
-  const handleResizeEnd = () => {
-    setIsResizing(false)
-    setResizeHandle(null)
-    
-    // Trigger save when component resize ends
-    if (projectId && selectedComponent) {
-      console.log('Component resized, triggering save...')
-      setTimeout(() => {
-        if (!isSaving && !isLoadingData) {
-          saveProjectData()
-        }
-      }, 2000) // 2 second delay to prevent rapid saves
-    }
-  }
-
-  // Drag from library handlers
-  const handleLibraryDragStart = (e: React.DragEvent, componentType: string) => {
-    e.dataTransfer.setData('componentType', componentType)
-    setIsDraggingFromLibrary(true)
-    setDraggedComponentType(componentType)
-    console.log('Started dragging component:', componentType)
-  }
-
-  const handleLibraryDragEnd = () => {
-    setIsDraggingFromLibrary(false)
-    setDraggedComponentType(null)
-  }
-
-  const handleScreenDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    const componentType = e.dataTransfer.getData('componentType')
-    const draggedComponentData = e.dataTransfer.getData('draggedComponent')
-    
-    // Get the screen that was dropped on by finding the closest screen element
-    const dropTarget = e.currentTarget as HTMLElement
-    const screenElement = dropTarget.closest('[data-screen-id]') as HTMLElement
-    const targetScreenId = screenElement?.getAttribute('data-screen-id')
-    
-    if (!targetScreenId) {
-      console.error('Could not determine target screen')
-      return
-    }
-    
-    // Find the target screen and its active layer
-    const targetScreen = screens.find(s => s.id === targetScreenId)
-    if (!targetScreen) {
-      console.error('Target screen not found:', targetScreenId)
-      return
-    }
-    
-    const targetLayer = targetScreen.layers.find(l => l.id === targetScreen.activeLayer)
-    if (!targetLayer) {
-      console.error('Target layer not found for screen:', targetScreenId)
-      return
-    }
-    
-    // Handle dropping a component from another screen
-    if (draggedComponentData && isDraggingComponent && draggedComponent) {
-      try {
-        const componentToMove = JSON.parse(draggedComponentData) as Component
-        
-        // Calculate drop position relative to the screen content
-        const screenContentElement = e.currentTarget as HTMLElement
-        const rect = screenContentElement.getBoundingClientRect()
-        let dropX = (e.clientX - rect.left) / zoom
-        let dropY = (e.clientY - rect.top) / zoom
-        
-        // Constrain to screen bounds
-        const screenWidth = targetScreen.width || 400
-        const screenHeight = targetScreen.height || 600
-        const componentWidth = componentToMove.size.width
-        const componentHeight = componentToMove.size.height
-        
-        dropX = Math.max(0, Math.min(dropX, screenWidth - componentWidth))
-        dropY = Math.max(0, Math.min(dropY, screenHeight - componentHeight))
-        
-        // Create new component with updated position
-        const movedComponent: Component = {
-          ...componentToMove,
-          id: Date.now().toString(), // New ID to avoid conflicts
-          position: { x: dropX, y: dropY }
-        }
-        
-        console.log('Moving component to target screen:', targetScreenId, movedComponent.id)
-        
-        // Add component to target screen
-          const updatedLayers = targetScreen.layers.map(layer => 
-            layer.id === targetScreen.activeLayer 
-              ? { ...layer, components: [...layer.components, movedComponent] }
-              : layer
-          )
-          
-        updateScreen(targetScreenId, {
-            layers: updatedLayers
-          })
-          
-          // Remove component from source screen
-          if (sourceScreenId && sourceLayerId) {
-            const sourceScreen = screens.find(s => s.id === sourceScreenId)
-            if (sourceScreen) {
-              const sourceLayers = sourceScreen.layers.map(layer => 
-                layer.id === sourceLayerId
-                  ? { ...layer, components: layer.components.filter(c => c.id !== componentToMove.id) }
-                  : layer
-              )
-              
-              updateScreen(sourceScreenId, {
-                layers: sourceLayers
-              })
-            }
-          }
-          
-        // Update selection to the moved component
-          setSelectedComponent(movedComponent)
-        
-        // Reset cross-screen dragging state
-        setIsDraggingComponent(false)
-        setDraggedComponent(null)
-        setSourceScreenId(null)
-        setSourceLayerId(null)
-        
-        return
-      } catch (error) {
-        console.error('Error parsing dragged component data:', error)
-      }
-    }
-    
-    // Handle dropping a new component from library
-    if (componentType) {
-      // Calculate drop position relative to the screen content
-      const screenContentElement = e.currentTarget as HTMLElement
-      const rect = screenContentElement.getBoundingClientRect()
-      let dropX = (e.clientX - rect.left) / zoom
-      let dropY = (e.clientY - rect.top) / zoom
-      
-      // Constrain to screen bounds
-      const screenWidth = targetScreen.width || 400
-      const screenHeight = targetScreen.height || 600
-      const componentWidth = 200
-      const componentHeight = 100
-      
-      dropX = Math.max(0, Math.min(dropX, screenWidth - componentWidth))
-      dropY = Math.max(0, Math.min(dropY, screenHeight - componentHeight))
-      
-      // Check for overlap with existing components
-      const existingComponents = targetLayer.components
-      let hasOverlap = false
-      
-      for (const component of existingComponents) {
-        const overlap = !(
-          dropX + componentWidth < component.position.x ||
-          dropX > component.position.x + component.size.width ||
-          dropY + componentHeight < component.position.y ||
-          dropY > component.position.y + component.size.height
-        )
-        
-        if (overlap) {
-          hasOverlap = true
-          break
-        }
-      }
-      
-      // If there's overlap, find a nearby position
-      if (hasOverlap) {
-        const gridSize = 20
-        let attempts = 0
-        const maxAttempts = 50
-        
-        while (attempts < maxAttempts) {
-          dropX += gridSize
-          if (dropX > screenWidth - componentWidth) {
-            dropX = 0
-            dropY += gridSize
-          }
-          
-          if (dropY > screenHeight - componentHeight) {
-            dropY = 0
-          }
-          
-          hasOverlap = false
-          for (const component of existingComponents) {
-            const overlap = !(
-              dropX + componentWidth < component.position.x ||
-              dropX > component.position.x + component.size.width ||
-              dropY + componentHeight < component.position.y ||
-              dropY > component.position.y + component.size.height
-            )
-            
-            if (overlap) {
-              hasOverlap = true
-              break
-            }
-          }
-          
-          if (!hasOverlap) {
-            break
-          }
-          
-          attempts++
-        }
-      }
-      
-      const newComponent: Component = {
-        id: Date.now().toString(),
-        type: componentType,
-        name: `${componentType.charAt(0).toUpperCase() + componentType.slice(1)} ${Date.now()}`,
-        props: {},
-        position: { x: dropX, y: dropY },
-        size: { width: componentWidth, height: componentHeight },
-        backgroundColor: '#ffffff',
-        interactions: {},
-        dataBinding: {},
-        zIndex: targetLayer.components.length + 1
-      }
-
-      console.log('Dropping component on target screen:', targetScreenId, 'at position:', { x: dropX, y: dropY })
-
-      // Add component to the context
-      addComponent(newComponent)
-      
-      // Update the target screen's active layer with the new component
-      const updatedLayers = targetScreen.layers.map(layer => 
-        layer.id === targetScreen.activeLayer 
-          ? { ...layer, components: [...layer.components, newComponent] }
-          : layer
-      )
-      
-      updateScreen(targetScreenId, {
-        layers: updatedLayers
-      })
-      
-      setSelectedComponent(newComponent)
-    }
-    setIsDraggingFromLibrary(false)
-    setDraggedComponentType(null)
-    
-    // Trigger save when component is dropped
-    if (projectId) {
-      console.log('Component dropped, triggering save...')
-      setTimeout(() => {
-        if (!isSaving && !isLoadingData) {
-          saveProjectData()
-        }
-      }, 3000) // 3 second delay to prevent rapid saves
-    }
-  }
-
-  const handleScreenDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-  }
-
-  // Component layering functions
-  const bringToFront = (componentId: string) => {
-    if (!currentScreen || !currentLayer) return
-    
-    const maxZIndex = Math.max(...currentLayer.components.map(c => c.zIndex || 1))
-    updateComponent(componentId, { zIndex: maxZIndex + 1 })
-  }
-
-  const sendToBack = (componentId: string) => {
-    if (!currentScreen || !currentLayer) return
-    
-    const minZIndex = Math.min(...currentLayer.components.map(c => c.zIndex || 1))
-    updateComponent(componentId, { zIndex: minZIndex - 1 })
-  }
-
-  const bringForward = (componentId: string) => {
-    if (!currentScreen || !currentLayer) return
-    
-    const component = currentLayer.components.find(c => c.id === componentId)
-    if (!component) return
-    
-    const currentZIndex = component.zIndex || 1
-    const nextComponent = currentLayer.components
-      .filter(c => c.id !== componentId)
-      .sort((a, b) => (a.zIndex || 1) - (b.zIndex || 1))
-      .find(c => (c.zIndex || 1) > currentZIndex)
-    
-    if (nextComponent) {
-      updateComponent(componentId, { zIndex: (nextComponent.zIndex || 1) + 1 })
-    }
-  }
-
-  const sendBackward = (componentId: string) => {
-    if (!currentScreen || !currentLayer) return
-    
-    const component = currentLayer.components.find(c => c.id === componentId)
-    if (!component) return
-    
-    const currentZIndex = component.zIndex || 1
-    const prevComponent = currentLayer.components
-      .filter(c => c.id !== componentId)
-      .sort((a, b) => (b.zIndex || 1) - (a.zIndex || 1))
-      .find(c => (c.zIndex || 1) < currentZIndex)
-    
-    if (prevComponent) {
-      updateComponent(componentId, { zIndex: (prevComponent.zIndex || 1) - 1 })
-    }
-  }
-
-  // Delete selected component
-  const deleteSelectedComponent = () => {
-    if (selectedComponent) {
-      deleteComponent(selectedComponent.id)
-      setSelectedComponent(null)
-    }
-  }
-
-  // Delete active screen
-  const deleteActiveScreen = () => {
-    if (activeScreen && screens.length > 1) {
-      const screenToDelete = screens.find(s => s.id === activeScreen)
-      if (screenToDelete) {
-        if (window.confirm(`Are you sure you want to delete "${screenToDelete.name}"? This action cannot be undone.`)) {
-          deleteScreen(activeScreen)
-        }
-      }
-    } else if (screens.length <= 1) {
-      alert('Cannot delete the last screen. Please add another screen first.')
-    }
-  }
-
-  // Calculate dynamic canvas size based on number of screens
-  const calculateCanvasSize = (): { width: string; height: string } => {
-    if (screens.length === 0) {
-      return { width: '2000px', height: '2000px' }
-    }
-
-    // Calculate canvas size based on screen positions like logic mode
-    let minX = 0, minY = 0, maxX = 0, maxY = 0
-
-    screens.forEach(screen => {
-      const screenPosition = screenPositions[screen.id] || { x: 100, y: 100 }
-      const screenRight = screenPosition.x + screen.width
-      const screenBottom = screenPosition.y + screen.height
-
-      minX = Math.min(minX, screenPosition.x)
-      minY = Math.min(minY, screenPosition.y)
-      maxX = Math.max(maxX, screenRight)
-      maxY = Math.max(maxY, screenBottom)
-    })
-
-    // Add padding around all screens
-    const padding = 200
-    return {
-      width: `${Math.max(2000, maxX - minX + padding * 2)}px`,
-      height: `${Math.max(2000, maxY - minY + padding * 2)}px`
-    }
-  }
-
-  const canvasSize = calculateCanvasSize()
-
-  // Helper function to calculate screen position consistently
-  const calculateScreenPosition = (screenIndex: number, _screen: Screen): { defaultX: number; defaultY: number } => {
-    // If this is the first screen, position it at the center
-    if (screenIndex === 0) {
-      return { defaultX: 100, defaultY: 100 }
-    }
-    
-    // For subsequent screens, position them beside the previous screen
-    const gapX = 50 // Horizontal gap between screens
-    const gapY = 50 // Vertical gap between screens
-    
-    // Get the position of the previous screen
-    const previousScreen = screens[screenIndex - 1]
-    const previousPosition = screenPositions[previousScreen.id] || { x: 0, y: 0 }
-    const previousScreenIndex = screens.findIndex(s => s.id === previousScreen.id)
-    const previousDefaultPos: { defaultX: number; defaultY: number } = calculateScreenPosition(previousScreenIndex, previousScreen)
-    
-    const previousX: number = previousPosition.x + previousDefaultPos.defaultX
-    const previousY: number = previousPosition.y + previousDefaultPos.defaultY
-    
-    // Position the new screen to the right of the previous screen
-    // If there's not enough space to the right, position it below
-    const newX: number = previousX + previousScreen.width + gapX
-    const newY: number = previousY
-    
-    // Check if the new position would be too far to the right
-    // If so, position it below the first screen in the row
-    const maxX = 1200 // Maximum X position before wrapping
-    if (newX > maxX) {
-      // Find the first screen in the current row and position below it
-      const firstScreenInRow = screens[0]
-      const firstPosition = screenPositions[firstScreenInRow.id] || { x: 0, y: 0 }
-      const firstDefaultPos: { defaultX: number; defaultY: number } = calculateScreenPosition(0, firstScreenInRow)
-      const firstX: number = firstPosition.x + firstDefaultPos.defaultX
-      const firstY: number = firstPosition.y + firstDefaultPos.defaultY
-      
-      return {
-        defaultX: firstX,
-        defaultY: firstY + firstScreenInRow.height + gapY
-      }
-    }
-    
-    return { defaultX: newX, defaultY: newY }
-  }
-
-  // Recalculate canvas size when screens change
-  useEffect(() => {
-    // Force re-render when screens array changes
-    // const newCanvasSize = calculateCanvasSize()
-    // The canvas size will be recalculated on next render
-  }, [screens.length])
-
-  // Close screen selector when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      if (showScreenSelector && !target.closest('.screen-selector')) {
-        setShowScreenSelector(false)
-      }
-    }
-
-      document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showScreenSelector])
-
-  // Global mouse event handlers for dragging and resizing
-  useEffect(() => {
-
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (isDragging || isResizing) {
         e.preventDefault()
+        setPan({
+          x: e.clientX - panStart.x,
+          y: e.clientY - panStart.y
+        })
       }
     }
 
-    const handleGlobalMouseUp = () => {
+    const handleMouseUp = () => {
       if (isPanning) {
         setIsPanning(false)
         document.body.style.cursor = 'default'
       }
-      if (draggedScreen) {
-        setDraggedScreen(null)
-        setScreenDragOffset({ x: 0, y: 0 })
-        document.body.style.cursor = 'default'
-      }
-      if (isDragging) {
-        setIsDragging(false)
-        setSelectedComponent(null)
-        document.body.style.cursor = 'default'
-      }
-      if (isResizing) {
-        setIsResizing(false)
-        setResizeHandle(null)
-        document.body.style.cursor = 'default'
-      }
     }
 
-    if (isDragging || isResizing) {
-      document.addEventListener('mousemove', handleGlobalMouseMove)
-      document.addEventListener('mouseup', handleGlobalMouseUp)
-      document.body.style.cursor = 'grabbing'
+    const element = containerRef.current
+    if (element) {
+      element.addEventListener('wheel', handleWheel, { passive: false })
+      element.addEventListener('mousedown', handleMouseDown)
+      element.addEventListener('mousemove', handleMouseMove)
+      element.addEventListener('mouseup', handleMouseUp)
     }
+
+    document.addEventListener('keydown', handleKeyDown)
+    document.addEventListener('keyup', handleKeyUp)
 
     return () => {
-      document.removeEventListener('mousemove', handleGlobalMouseMove)
-      document.removeEventListener('mouseup', handleGlobalMouseUp)
-      document.body.style.cursor = 'default'
+      if (element) {
+        element.removeEventListener('wheel', handleWheel)
+        element.removeEventListener('mousedown', handleMouseDown)
+        element.removeEventListener('mousemove', handleMouseMove)
+        element.removeEventListener('mouseup', handleMouseUp)
+      }
+      document.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('keyup', handleKeyUp)
     }
-  }, [isDragging, isResizing, isPanning, draggedScreen, screenDragOffset, pan, zoom, selectedComponent, activeScreen, screens, screenPositions])
+  }, [isPanning, pan.x, pan.y, panStart.x, panStart.y, isDraggingScreen, activeTool])
 
-
-  // Helper function to automatically position new screens beside the current active screen
-  const [isCreatingScreen, setIsCreatingScreen] = useState(false)
-  
-  const createScreenWithPosition = (screenData: Partial<Screen>) => {
-    // Prevent multiple rapid screen creations
-    if (isCreatingScreen) {
-      console.log('Screen creation already in progress, skipping...')
+  // Component drag handlers
+  const handleComponentMouseDown = (
+    e: React.MouseEvent,
+    component: Component,
+    screenId: string
+  ) => {
+    // If a drawing tool is active, start drawing instead of selecting/moving the component
+    if (!['select', 'move', 'hand', 'scale'].includes(activeTool)) {
+      beginDrawOnScreen(e, screenId)
       return
     }
+
+    e.stopPropagation()
+    setActiveTool('select')
+    setSelectedComponentId(component.id)
+    setRightSidebarVisible(true)
+
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return
+
+    // Mouse position in canvas coordinates
+    const mouseX = (e.clientX - rect.left - pan.x) / zoom
+    const mouseY = (e.clientY - rect.top - pan.y) / zoom
+
+    const screenPos = screenPositions[screenId] || { x: 0, y: 0 }
+    // Detect parent container from data model (no DOM metrics to avoid transform issues)
+    draggingParentIdRef.current = null
+    draggingContainerPosRef.current = { x: 0, y: 0 }
+    draggingContainerBoundsRef.current = { width: 0, height: 0 }
+    let containerOffsetX = 0
+    let containerOffsetY = 0
+    const screenData = screens.find(s => s.id === screenId)
+    if (screenData) {
+      // Find direct parent component whose children include this component
+      let foundParent: Component | null = null
+      for (const layer of screenData.layers) {
+        for (const comp of layer.components) {
+          if (comp.children && comp.children.some(ch => ch.id === component.id)) {
+            foundParent = comp
+            break
+          }
+        }
+        if (foundParent) break
+      }
+      if (foundParent) {
+        draggingParentIdRef.current = foundParent.id
+        containerOffsetX = foundParent.position.x
+        containerOffsetY = foundParent.position.y
+        draggingContainerPosRef.current = { x: containerOffsetX, y: containerOffsetY }
+        draggingContainerBoundsRef.current = { width: foundParent.size.width, height: foundParent.size.height }
+      }
+    }
+
+    const offsetX = mouseX - (screenPos.x + containerOffsetX + component.position.x)
+    const offsetY = mouseY - (screenPos.y + containerOffsetY + component.position.y)
+
+    setDraggingComponentId(component.id)
+    setDraggingComponentScreenId(screenId)
+    setComponentDragOffset({ x: offsetX, y: offsetY })
+    document.body.style.cursor = 'grabbing'
+
+    draggingElementRef.current = e.currentTarget as HTMLElement
+    if (draggingElementRef.current) {
+      draggingElementRef.current.style.transition = 'none'
+      draggingElementRef.current.style.willChange = 'transform'
+    }
+    // Improve responsiveness during drag
+    document.body.style.userSelect = 'none'
+    draggingBasePosRef.current = { x: component.position.x, y: component.position.y }
+    draggingLivePosRef.current = { x: component.position.x, y: component.position.y }
+
+    // Cache metrics to avoid heavy lookups during drag
+    draggingScreenPosRef.current = { x: screenPos.x, y: screenPos.y }
+    const currentScreen = screens.find(s => s.id === screenId)
+    if (currentScreen) {
+      draggingScreenBoundsRef.current = { width: currentScreen.width, height: currentScreen.height }
+    } else {
+      draggingScreenBoundsRef.current = { width: 0, height: 0 }
+    }
+    draggingComponentSizeRef.current = { width: component.size.width, height: component.size.height }
+  }
+
+  const handleComponentMouseMove = useCallback((e: MouseEvent) => {
+    if (!draggingComponentId || !draggingComponentScreenId) return
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return
+
+    const screenPos = draggingScreenPosRef.current
+    const bounds = draggingParentIdRef.current ? draggingContainerBoundsRef.current : draggingScreenBoundsRef.current
+    const compSize = draggingComponentSizeRef.current
+    const mouseX = (e.clientX - rect.left - pan.x) / zoom
+    const mouseY = (e.clientY - rect.top - pan.y) / zoom
+
+    const containerOffsetX = draggingParentIdRef.current ? draggingContainerPosRef.current.x : 0
+    const containerOffsetY = draggingParentIdRef.current ? draggingContainerPosRef.current.y : 0
+
+    let newX = mouseX - screenPos.x - containerOffsetX - componentDragOffset.x
+    let newY = mouseY - screenPos.y - containerOffsetY - componentDragOffset.y
+
+    if (bounds.width && bounds.height) {
+      newX = Math.max(0, Math.min(newX, bounds.width - (compSize.width || 0)))
+      newY = Math.max(0, Math.min(newY, bounds.height - (compSize.height || 0)))
+    }
+
+    // Compute pixel-snapping alignment guides (Figma-like)
+    // Guides: center and edges relative to other components on the same screen
+    const screen = screens.find(s => s.id === draggingComponentScreenId)
+    const vGuides: number[] = []
+    const hGuides: number[] = []
+    let snappedX = newX
+    let snappedY = newY
+    const SNAP = 6 // px tolerance
+    if (screen) {
+      const withinSameContainer = (comp: Component): boolean => {
+        const parentId = draggingParentIdRef.current
+        if (!parentId) {
+          // only top-level components
+          // comp is top-level if it is directly in any layer (which all here are), and dragged component has no parent
+          // Since we are iterating top-level comps, keep them
+          return true
+        }
+        // include only direct children of the same parent
+        const parent = screen.layers.flatMap(l => l.components).find(c => c.id === parentId)
+        return !!parent && !!parent.children && parent.children.some(ch => ch.id === comp.id)
+      }
+      const topLevel = screen.layers.flatMap(l => l.components)
+      const others = draggingParentIdRef.current
+        ? (topLevel.find(c => c.id === draggingParentIdRef.current)?.children || [])
+        : topLevel
+      .filter(c => c.id !== draggingComponentId && withinSameContainer(c as Component)) as Component[]
+      const cx = newX + (compSize.width || 0) / 2
+      const cy = newY + (compSize.height || 0) / 2
+      const edges = {
+        left: newX,
+        right: newX + (compSize.width || 0),
+        top: newY,
+        bottom: newY + (compSize.height || 0)
+      }
+      const showV: number[] = []
+      const showH: number[] = []
+      for (const other of others) {
+        const ocx = other.position.x + other.size.width / 2
+        const ocy = other.position.y + other.size.height / 2
+        const oLeft = other.position.x
+        const oRight = other.position.x + other.size.width
+        const oTop = other.position.y
+        const oBottom = other.position.y + other.size.height
+
+        // vertical alignment: centers and left/right edges
+        if (Math.abs(cx - ocx) <= SNAP) {
+          snappedX = ocx - (compSize.width || 0) / 2
+          showV.push(ocx)
+        }
+        if (Math.abs(edges.left - oLeft) <= SNAP) {
+          snappedX = oLeft
+          showV.push(oLeft)
+        }
+        if (Math.abs(edges.right - oRight) <= SNAP) {
+          snappedX = oRight - (compSize.width || 0)
+          showV.push(oRight)
+        }
+
+        // horizontal alignment: centers and top/bottom edges
+        if (Math.abs(cy - ocy) <= SNAP) {
+          snappedY = ocy - (compSize.height || 0) / 2
+          showH.push(ocy)
+        }
+        if (Math.abs(edges.top - oTop) <= SNAP) {
+          snappedY = oTop
+          showH.push(oTop)
+        }
+        if (Math.abs(edges.bottom - oBottom) <= SNAP) {
+          snappedY = oBottom - (compSize.height || 0)
+          showH.push(oBottom)
+        }
+      }
+      vGuides.push(...Array.from(new Set(showV)))
+      hGuides.push(...Array.from(new Set(showH)))
+    }
+
+    // apply snapping if any
+    if (vGuides.length > 0) newX = snappedX
+    if (hGuides.length > 0) newY = snappedY
+    if (snapToGrid) {
+      newX = Math.round(newX / gridSize) * gridSize
+      newY = Math.round(newY / gridSize) * gridSize
+    }
+
+    // Update guide overlay and measurement badge
+    const badgeText = `${Math.round(newX)}, ${Math.round(newY)} • ${Math.round(compSize.width || 0)} × ${Math.round(compSize.height || 0)}`
+    setDragGuides({
+      screenId: draggingComponentScreenId,
+      offsetX: draggingParentIdRef.current ? draggingContainerPosRef.current.x : 0,
+      offsetY: draggingParentIdRef.current ? draggingContainerPosRef.current.y : 0,
+      v: vGuides.map(x => x + (draggingParentIdRef.current ? draggingContainerPosRef.current.x : 0)),
+      h: hGuides.map(y => y + (draggingParentIdRef.current ? draggingContainerPosRef.current.y : 0)),
+      badge: { x: newX + (draggingParentIdRef.current ? draggingContainerPosRef.current.x : 0), y: newY - 16 + (draggingParentIdRef.current ? draggingContainerPosRef.current.y : 0), text: badgeText }
+    })
+
+    draggingLivePosRef.current = { x: newX, y: newY }
+    if (rafIdRef.current == null) {
+      rafIdRef.current = requestAnimationFrame(() => {
+        const el = draggingElementRef.current
+        if (el) {
+          const dx = draggingLivePosRef.current.x - draggingBasePosRef.current.x
+          const dy = draggingLivePosRef.current.y - draggingBasePosRef.current.y
+          el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`
+        }
+        rafIdRef.current = null
+      })
+    }
+  }, [draggingComponentId, draggingComponentScreenId, canvasRef, pan.x, pan.y, zoom, componentDragOffset.x, componentDragOffset.y])
+
+  const handleComponentMouseUp = useCallback(() => {
+    if (draggingComponentId) {
+      // Commit final position to React state
+      if (draggingComponentScreenId) {
+        updateComponentInScreen(
+          draggingComponentScreenId,
+          draggingComponentId,
+          { position: { x: draggingLivePosRef.current.x, y: draggingLivePosRef.current.y } }
+        )
+      }
+
+      if (rafIdRef.current != null) {
+        cancelAnimationFrame(rafIdRef.current)
+        rafIdRef.current = null
+      }
+      if (draggingElementRef.current) {
+        draggingElementRef.current.style.transition = ''
+        draggingElementRef.current.style.willChange = ''
+        draggingElementRef.current.style.transform = ''
+      }
+      draggingElementRef.current = null
+      document.body.style.userSelect = 'auto'
+      setDraggingComponentId(null)
+      setDraggingComponentScreenId(null)
+      setComponentDragOffset({ x: 0, y: 0 })
+      document.body.style.cursor = 'default'
+      setDragGuides({ screenId: null, offsetX: 0, offsetY: 0, v: [], h: [], badge: null })
+    }
+  }, [draggingComponentId, draggingComponentScreenId, updateComponentInScreen])
+
+  useEffect(() => {
+    if (draggingComponentId) {
+      document.addEventListener('mousemove', handleComponentMouseMove)
+      document.addEventListener('mouseup', handleComponentMouseUp)
+      return () => {
+        document.removeEventListener('mousemove', handleComponentMouseMove)
+        document.removeEventListener('mouseup', handleComponentMouseUp)
+      }
+    }
+  }, [draggingComponentId, handleComponentMouseMove, handleComponentMouseUp])
+
+  // Add default screen function for initial setup  
+  const handleAddDefaultScreen = () => {
+    console.log('Creating default screen, current screens:', screens.length)
     
-    console.log('Creating new screen:', screenData.name)
-    setIsCreatingScreen(true)
+    const screenPreset = SCREEN_PRESETS[0] // iPhone 14
+    const now = Date.now()
+    const bgLayerId = `layer-${now}-bg`
+    const mainLayerId = `layer-${now}-main`
+    const uiLayerId = `layer-${now}-ui`
+    const screenId = `screen-${Date.now()}`
     
-    const timestamp = Date.now()
-    const newScreen: Screen = {
-      id: timestamp.toString(),
-      name: screenData.name || `Screen ${timestamp}`,
-      width: screenData.width || 1200,
-      height: screenData.height || 800,
-      type: screenData.type || 'custom',
+    const newScreen = {
+      id: screenId,
+      name: 'Main Page', // Default name for the main screen
+      width: screenPreset.width,
+      height: screenPreset.height,
+      type: screenPreset.type,
+      activeLayer: mainLayerId, // Set main layer as active
       layers: [
         {
-          id: timestamp.toString() + '_layer',
-          name: 'Main Layout',
+          id: bgLayerId,
+          name: 'Background',
+          visible: true,
+          locked: false,
+          components: []
+        },
+        {
+          id: mainLayerId,
+          name: 'Main Layer',
+          visible: true,
+          locked: false,
+          components: []
+        },
+        {
+          id: uiLayerId,
+          name: 'UI Layer',
+          visible: true,
+          locked: false,
+          components: []
+        }
+      ]
+    }
+    
+    addScreen(newScreen)
+    // Position the default screen at a standard location
+    updateScreenPosition(screenId, { x: 200, y: 100 })
+    setActiveScreen(screenId)
+    console.log('Default screen created and positioned')
+  }
+
+  // Add screen function
+  const handleAddScreen = (preset?: typeof SCREEN_PRESETS[0]) => {
+    const screenPreset = preset || SCREEN_PRESETS[0]
+    const now = Date.now()
+    const bgLayerId = `layer-${now}-bg`
+    const mainLayerId = `layer-${now}-main`
+    const uiLayerId = `layer-${now}-ui`
+    const screenId = `screen-${Date.now()}`
+    
+    const newScreen = {
+      id: screenId,
+      name: `${screenPreset.name} ${screens.length + 1}`,
+      width: screenPreset.width,
+      height: screenPreset.height,
+      type: screenPreset.type,
+      layers: [
+        {
+          id: bgLayerId,
+          name: 'Background',
+        visible: true,
+        locked: false,
+        components: []
+        },
+        {
+          id: mainLayerId,
+          name: 'Main',
+          visible: true,
+          locked: false,
+          components: []
+        },
+        {
+          id: uiLayerId,
+          name: 'UI',
           visible: true,
           locked: false,
           components: []
         }
       ],
-      activeLayer: timestamp.toString() + '_layer'
+      activeLayer: mainLayerId
     }
     
-    console.log('Adding screen to context:', newScreen.id)
-    // Add the screen and set it as active immediately
+    // Calculate position for new screen (arrange them in a grid)
+    const spacing = 100
+    const screensPerRow = 3
+    const row = Math.floor(screens.length / screensPerRow)
+    const col = screens.length % screensPerRow
+    const x = 200 + col * (screenPreset.width + spacing)
+    const y = 100 + row * (screenPreset.height + spacing)
+    
     addScreen(newScreen)
-    setActiveScreen(newScreen.id)
-    
-    // Calculate position for the new screen beside the current active screen
-    let newPosition = { x: 200, y: 200 } // Default position if no active screen
-    
-    if (activeScreen && screens.length > 0) {
-      // Find the currently active screen
-      const currentActiveScreen = screens.find(s => s.id === activeScreen)
-      if (currentActiveScreen) {
-        // Get the current active screen's position
-        const currentScreenPosition = screenPositions[activeScreen] || { x: 0, y: 0 }
-        const currentScreenIndex = screens.findIndex(s => s.id === activeScreen)
-        const { defaultX: currentDefaultX, defaultY: currentDefaultY } = calculateScreenPosition(currentScreenIndex, currentActiveScreen)
-        
-        // Calculate the actual position of the current active screen
-        const currentScreenX = currentDefaultX + currentScreenPosition.x
-        const currentScreenY = currentDefaultY + currentScreenPosition.y
-        
-        // Position the new screen to the right of the current active screen
-        const spacing = 50 // Space between screens
-        newPosition = {
-          x: currentScreenX + currentActiveScreen.width + spacing,
-          y: currentScreenY
-        }
-        
-        // If the new position would be too far to the right, position it below
-        const maxX = 1200 // Maximum X position before wrapping
-        if (newPosition.x > maxX) {
-          newPosition = {
-            x: currentScreenX,
-            y: currentScreenY + currentActiveScreen.height + spacing
-          }
-        }
-        
-        console.log('Positioning new screen beside active screen:', {
-          currentScreen: currentActiveScreen.name,
-          currentPosition: { x: currentScreenX, y: currentScreenY },
-          newPosition: newPosition
-        })
-      }
-    }
-    
-    // Set initial position for the new screen
-      updateScreenPosition(newScreen.id, newPosition)
-    
-    // Center the view on the new screen to ensure it's visible
-    setTimeout(() => {
-      const canvasContainer = containerRef.current
-      if (canvasContainer) {
-        const containerRect = canvasContainer.getBoundingClientRect()
-        const centerX = containerRect.width / 2
-        const centerY = containerRect.height / 2
-        
-        // Calculate pan to center the new screen
-        const newScreenX = newPosition.x + newScreen.width / 2
-        const newScreenY = newPosition.y + newScreen.height / 2
-        
-        setPan({
-          x: centerX - newScreenX * zoom,
-          y: centerY - newScreenY * zoom
-        })
-      }
-    }, 100)
-    
-    setIsCreatingScreen(false)
+    updateScreenPosition(screenId, { x, y })
+    setActiveScreen(screenId)
+    setShowScreenPresets(false)
+    // Open left sidebar once a screen exists
+    setLeftSidebarVisible(true)
   }
 
-  // Fetch project information
-  const fetchProjectInfo = useCallback(async () => {
-    if (!projectId) return
+      // Component drag and drop
+  const handleComponentDragStart = (e: React.DragEvent, componentType: string, payload?: any) => {
+    e.dataTransfer.setData('application/json', JSON.stringify({
+      type: 'component',
+      componentType: componentType,
+      ...(payload || {})
+    }))
+    e.dataTransfer.effectAllowed = 'copy'
+    setIsDraggingComponent(true)
+    setDraggedComponentType(componentType)
+  }
+
+  const handleComponentDragEnd = () => {
+    setIsDraggingComponent(false)
+    setDraggedComponentType(null)
+  }
+
+  const handleCanvasDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+  }
+
+    const handleCanvasDrop = (e: React.DragEvent) => {
+    e.preventDefault()
     
-    setLoadingProject(true)
     try {
-      const projectData = await ProjectService.getProjectWithData(projectId)
-      setProjectInfo({
-        name: projectData.project.name,
-        language: projectData.project.language,
-        device: projectData.project.device
-      })
+      const data = JSON.parse(e.dataTransfer.getData('application/json'))
+      if (data.type !== 'component' || !activeScreen) return
+
+      const rect = canvasRef.current?.getBoundingClientRect()
+      if (!rect) return
+
+      // Calculate the mouse position in canvas coordinates
+      const canvasX = (e.clientX - rect.left - pan.x) / zoom
+      const canvasY = (e.clientY - rect.top - pan.y) / zoom
+
+      // Find which screen the component was dropped on
+      let targetScreen = currentScreen
+      let targetScreenPos = screenPositions[activeScreen || ''] || { x: 200, y: 100 }
+
+      // Check if dropped on any other screen
+      for (const screen of screens) {
+        const screenPos = screenPositions[screen.id] || { x: 200, y: 100 }
+        if (canvasX >= screenPos.x && canvasX <= screenPos.x + screen.width &&
+            canvasY >= screenPos.y && canvasY <= screenPos.y + screen.height) {
+          targetScreen = screen
+          targetScreenPos = screenPos
+          setActiveScreen(screen.id)
+          break
+        }
+      }
+
+      if (!targetScreen) return
+
+      // Calculate position relative to the target screen
+      const x = Math.max(0, Math.min(canvasX - targetScreenPos.x, targetScreen.width - 120))
+      const y = Math.max(0, Math.min(canvasY - targetScreenPos.y, targetScreen.height - 40))
+
+      console.log('Drop position:', { canvasX, canvasY, x, y, targetScreen: targetScreen.name })
+
+      const activeLayer = targetScreen.layers.find(layer => layer.id === targetScreen.activeLayer)
+      const nextZ = activeLayer ? Math.max(0, ...activeLayer.components.map(c => c.zIndex || 0)) + 1 : 1
+      // Determine component type and default properties
+      const droppedType = data.componentType || (data.packageName ? 'external' : 'rectangle')
+      const newComponent: Component = {
+        id: `component-${Date.now()}`,
+        type: droppedType,
+        name: `${droppedType.charAt(0).toUpperCase() + droppedType.slice(1)} ${Date.now()}`,
+        props: droppedType === 'external' ? { source: 'npm', package: data.packageName, link: data.packageLink } : getDefaultProps(droppedType),
+        position: { x, y },
+        size: { width: 120, height: 40 },
+        backgroundColor: droppedType === 'button' ? '#ef4444' : '#ffffff',
+        zIndex: nextZ
+      }
+
+      // Add component to the target screen's active layer
+      if (activeLayer) {
+        // Update the screen with the new component in the active layer
+        const updatedLayers = targetScreen.layers.map(layer => 
+          layer.id === targetScreen.activeLayer 
+            ? { ...layer, components: [...layer.components, newComponent] }
+            : layer
+        )
+        updateScreen(targetScreen.id, { layers: updatedLayers })
+      }
+      
+      // Also add to global components for compatibility
+      addComponent(newComponent)
+      setSelectedComponentId(newComponent.id)
+      setRightSidebarVisible(true)
+      setActiveTool('select')
     } catch (error) {
-      console.error('Error fetching project info:', error)
-    } finally {
-      setLoadingProject(false)
+      console.error('Error parsing drop data:', error)
     }
-  }, [projectId])
-  
-  // Load project info on mount
-  useEffect(() => {
-    fetchProjectInfo()
-  }, [fetchProjectInfo])
-
-  // Toolbar state
-  const [activeTool, setActiveTool] = useState<'select' | 'rectangle' | 'circle' | 'triangle' | 'text' | 'image' | 'line' | 'container'>('select')
-  const [isDrawing, setIsDrawing] = useState(false)
-  const [drawingStart, setDrawingStart] = useState({ x: 0, y: 0 })
-  const [currentDrawing, setCurrentDrawing] = useState<any>(null)
-
-  // Toolbar functions
-  const handleToolSelect = (tool: 'select' | 'rectangle' | 'circle' | 'triangle' | 'text' | 'image' | 'line' | 'container') => {
-    setActiveTool(tool)
+    
+      setIsDraggingComponent(false)
+    setDraggedComponentType(null)
   }
 
-  const handleCanvasMouseDown = (e: React.MouseEvent) => {
-    console.log('Canvas mouse down, activeTool:', activeTool)
-    
-    if (activeTool === 'select') {
-      // Handle selection
+  // Nested drop: drop a new palette component or move an existing component into a container component
+  const handleNestedDrop = (e: React.DragEvent, screenId: string, parentId: string) => {
+    e.preventDefault()
+    try {
+      const dataText = e.dataTransfer.getData('application/json')
+      if (!dataText) return
+      const data = JSON.parse(dataText)
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+      const canvasRect = canvasRef.current?.getBoundingClientRect()
+      if (!canvasRect) return
+      const canvasX = (e.clientX - canvasRect.left - pan.x) / zoom
+      const canvasY = (e.clientY - canvasRect.top - pan.y) / zoom
+
+      const screen = screens.find(s => s.id === screenId)
+      if (!screen) return
+      const screenPos = screenPositions[screenId] || { x: 200, y: 100 }
+      // position relative to parent container
+      const parentEl = document.getElementById(`comp-${parentId}`)
+      if (!parentEl) return
+      const parentRect = parentEl.getBoundingClientRect()
+      const parentOffsetX = (parentRect.left - canvasRect.left - pan.x) / zoom
+      const parentOffsetY = (parentRect.top - canvasRect.top - pan.y) / zoom
+
+      const localX = canvasX - (screenPos.x + parentOffsetX)
+      const localY = canvasY - (screenPos.y + parentOffsetY)
+
+      if (data.kind === 'component') {
+        // Move existing component into parent
+        const { componentId: draggedId, screenId: fromScreenId } = data
+        const fromScreen = screens.find(s => s.id === fromScreenId)
+        const sourceComp = fromScreen?.layers.flatMap(l => l.components).find(c => c.id === draggedId)
+        if (!sourceComp) return
+        const child: Component = {
+          ...sourceComp,
+          position: { x: Math.max(0, localX), y: Math.max(0, localY) }
+        }
+        // Remove from top-level of source screen
+        if (fromScreen) {
+          const newSourceLayers = removeComponentFromScreen(fromScreen, draggedId)
+          updateScreen(fromScreen.id, { layers: newSourceLayers })
+        }
+        // Add as child to parent in target screen
+        addChildComponentInScreen(screenId, parentId, child)
+        setSelectedComponentId(child.id)
+        setRightSidebarVisible(true)
+      } else if (data.type === 'component') {
+        // Palette drop to nested parent
+        const componentType = data.componentType
+        const id = `component-${Date.now()}`
+        const child: Component = {
+          id,
+          type: componentType,
+          name: componentType.charAt(0).toUpperCase() + componentType.slice(1),
+          props: getDefaultProps(componentType),
+          position: { x: Math.max(0, localX), y: Math.max(0, localY) },
+          size: { width: 120, height: 48 },
+          backgroundColor: componentType === 'button' ? '#ef4444' : '#ffffff',
+          zIndex: 1
+        }
+        addChildComponentInScreen(screenId, parentId, child)
+        setSelectedComponentId(child.id)
+        setRightSidebarVisible(true)
+      }
+    } catch {}
+  }
+
+  // Screen dragging functions
+  const handleScreenMouseDown = (e: React.MouseEvent, screenId: string) => {
+    // Only start dragging if clicking on screen header/title area
+    if (e.target !== e.currentTarget && !(e.target as HTMLElement).classList.contains('screen-header')) {
       return
     }
-
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = (e.clientX - rect.left) / zoom
-    const y = (e.clientY - rect.top) / zoom
-
-    console.log('Starting drawing at:', x, y)
-
-    setIsDrawing(true)
-    setDrawingStart({ x, y })
-
-    // Create a temporary drawing element
-    const drawingElement = {
-      type: activeTool,
-      x,
-      y,
-      width: 0,
-      height: 0,
-      id: Date.now().toString()
+    
+    e.stopPropagation()
+    setIsDraggingScreen(true)
+    setDraggedScreenId(screenId)
+    screenDragElementRef.current = e.currentTarget as HTMLElement
+    if (screenDragElementRef.current) {
+      screenDragElementRef.current.style.willChange = 'transform'
+      screenDragElementRef.current.style.transition = 'none'
     }
-
-    setCurrentDrawing(drawingElement)
+    document.body.style.userSelect = 'none'
+    
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (rect) {
+      const mouseX = (e.clientX - rect.left - pan.x) / zoom
+      const mouseY = (e.clientY - rect.top - pan.y) / zoom
+      const screenPos = screenPositions[screenId] || { x: 0, y: 0 }
+      setScreenDragStart({
+        x: mouseX - screenPos.x,
+        y: mouseY - screenPos.y
+      })
+      screenDragBasePosRef.current = { x: screenPos.x, y: screenPos.y }
+      screenDragLivePosRef.current = { x: screenPos.x, y: screenPos.y }
+    }
+    setActiveScreen(screenId)
   }
 
-  const handleCanvasMouseMove = (e: React.MouseEvent) => {
-    if (!isDrawing || !currentDrawing) return
+  const handleScreenMouseMove = useCallback((e: MouseEvent) => {
+    if (isDraggingScreen && draggedScreenId) {
+      const rect = canvasRef.current?.getBoundingClientRect()
+      if (!rect) return
+        const mouseX = (e.clientX - rect.left - pan.x) / zoom
+        const mouseY = (e.clientY - rect.top - pan.y) / zoom
+        const newX = mouseX - screenDragStart.x
+        const newY = mouseY - screenDragStart.y
+        
+      screenDragLivePosRef.current = { x: newX, y: newY }
+      if (screenDragRafIdRef.current == null) {
+        screenDragRafIdRef.current = requestAnimationFrame(() => {
+          const el = screenDragElementRef.current
+          if (el) {
+            const dx = screenDragLivePosRef.current.x - screenDragBasePosRef.current.x
+            const dy = screenDragLivePosRef.current.y - screenDragBasePosRef.current.y
+            el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`
+          }
+          screenDragRafIdRef.current = null
+        })
+      }
+    }
+  }, [isDraggingScreen, draggedScreenId, pan.x, pan.y, zoom, screenDragStart])
 
-    const rect = e.currentTarget.getBoundingClientRect()
-    const x = (e.clientX - rect.left) / zoom
-    const y = (e.clientY - rect.top) / zoom
+  const handleScreenMouseUp = useCallback(() => {
+    if (isDraggingScreen && draggedScreenId) {
+      updateScreenPosition(draggedScreenId, {
+        x: screenDragLivePosRef.current.x,
+        y: screenDragLivePosRef.current.y
+      })
+    }
+    if (screenDragRafIdRef.current != null) {
+      cancelAnimationFrame(screenDragRafIdRef.current)
+      screenDragRafIdRef.current = null
+    }
+    if (screenDragElementRef.current) {
+      screenDragElementRef.current.style.transform = ''
+      screenDragElementRef.current.style.transition = ''
+      screenDragElementRef.current.style.willChange = ''
+    }
+    screenDragElementRef.current = null
+    document.body.style.userSelect = 'auto'
+    setIsDraggingScreen(false)
+    setDraggedScreenId(null)
+    setScreenDragStart({ x: 0, y: 0 })
+  }, [isDraggingScreen, draggedScreenId, updateScreenPosition])
 
-    const width = Math.abs(x - drawingStart.x)
-    const height = Math.abs(y - drawingStart.y)
+  // Add screen dragging event listeners
+  useEffect(() => {
+    if (isDraggingScreen) {
+      document.addEventListener('mousemove', handleScreenMouseMove)
+      document.addEventListener('mouseup', handleScreenMouseUp)
+      return () => {
+        document.removeEventListener('mousemove', handleScreenMouseMove)
+        document.removeEventListener('mouseup', handleScreenMouseUp)
+      }
+    }
+  }, [isDraggingScreen, handleScreenMouseMove, handleScreenMouseUp])
 
-    console.log('Drawing update:', width, height)
+  // Drawing on screen (rectangle/text)
+  const beginDrawOnScreen = (e: React.MouseEvent, screenId: string) => {
+    if (activeTool === 'select' || activeTool === 'move' || activeTool === 'hand' || activeTool === 'scale') return
+    e.stopPropagation()
+    const rect = canvasRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const mouseX = (e.clientX - rect.left - pan.x) / zoom
+    const mouseY = (e.clientY - rect.top - pan.y) / zoom
+    const screenPos = screenPositions[screenId] || { x: 0, y: 0 }
+    let startX = mouseX - screenPos.x
+    let startY = mouseY - screenPos.y
+    if (snapToGrid) {
+      startX = Math.round(startX / gridSize) * gridSize
+      startY = Math.round(startY / gridSize) * gridSize
+    }
 
-    setCurrentDrawing({
-      ...currentDrawing,
-      width,
-      height
+    const id = `component-${Date.now()}`
+    const screen = screens.find(s => s.id === screenId)
+    if (!screen) return
+    const activeLayer = screen.layers.find(l => l.id === screen.activeLayer)
+    const nextZ = activeLayer ? Math.max(0, ...activeLayer.components.map(c => c.zIndex || 0)) + 1 : 1
+    const base: Component = {
+      id,
+      type:
+        activeTool === 'text' ? 'text' :
+        activeTool === 'ellipse' ? 'ellipse' :
+        activeTool === 'line' ? 'line' :
+        activeTool === 'arrow' ? 'arrow' :
+        activeTool === 'polygon' ? 'polygon' :
+        activeTool === 'star' ? 'star' :
+        activeTool === 'image' ? 'image' :
+        activeTool === 'frame' ? 'frame' :
+        activeTool === 'comment' ? 'comment' :
+        activeTool === 'annotation' ? 'annotation' :
+        activeTool === 'measurement' ? 'measurement' :
+        'container',
+      name:
+        activeTool === 'text' ? 'Text' :
+        activeTool === 'ellipse' ? 'Ellipse' :
+        activeTool === 'line' ? 'Line' :
+        activeTool === 'arrow' ? 'Arrow' :
+        activeTool === 'polygon' ? 'Polygon' :
+        activeTool === 'star' ? 'Star' :
+        activeTool === 'image' ? 'Image' :
+        activeTool === 'frame' ? 'Frame' :
+        activeTool === 'comment' ? 'Comment' :
+        activeTool === 'annotation' ? 'Annotation' :
+        activeTool === 'measurement' ? 'Measurement' :
+        'Rectangle',
+      props: activeTool === 'text'
+        ? { text: 'Text', fontSize: 16, fontWeight: '500' }
+        : activeTool === 'line' || activeTool === 'arrow' || activeTool === 'measurement'
+        ? { lineColor: '#111827', thickness: 2 }
+        : activeTool === 'polygon'
+        ? { sides: 5, lineColor: '#111827', thickness: 1 }
+        : activeTool === 'star'
+        ? { points: 5, innerRatio: 0.5, lineColor: '#111827', thickness: 1 }
+        : activeTool === 'image'
+        ? { src: '', alt: 'Image', objectFit: 'cover' }
+        : activeTool === 'frame'
+        ? { platform: 'android', preset: 'custom' }
+        : activeTool === 'comment'
+        ? { text: 'Comment', color: '#111827' }
+        : activeTool === 'annotation'
+        ? { color: 'rgba(255, 214, 10, 0.25)', borderColor: '#f59e0b', borderWidth: 2 }
+        : {},
+      position: { x: startX, y: startY },
+      size: { width: 1, height: 1 },
+      backgroundColor: activeTool === 'text' ? 'transparent' : activeTool === 'frame' ? '#ffffff' : '#ffffff',
+      zIndex: nextZ
+    }
+
+    // Add to screen's active layer
+    const updatedLayers = screen.layers.map(layer =>
+      layer.id === screen.activeLayer
+        ? { ...layer, components: [...layer.components, base] }
+        : layer
+    )
+    updateScreen(screenId, { layers: updatedLayers })
+    setSelectedComponentId(base.id)
+    setRightSidebarVisible(true)
+
+    setIsDrawing(true)
+    setDrawingComponentId(id)
+    setDrawingStart({ x: startX, y: startY })
+    setDrawingScreenId(screenId)
+  }
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!isDrawing || !drawingComponentId || !drawingScreenId) return
+      const rect = canvasRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const mouseX = (e.clientX - rect.left - pan.x) / zoom
+      const mouseY = (e.clientY - rect.top - pan.y) / zoom
+      const screenPos = screenPositions[drawingScreenId] || { x: 0, y: 0 }
+      const x = mouseX - screenPos.x
+      const y = mouseY - screenPos.y
+      let newX = Math.min(drawingStart.x, x)
+      let newY = Math.min(drawingStart.y, y)
+      let newW = Math.abs(x - drawingStart.x)
+      let newH = Math.abs(y - drawingStart.y)
+
+      // Clamp to screen bounds
+      const screen = screens.find(s => s.id === drawingScreenId)
+      if (screen) {
+        newX = Math.max(0, Math.min(newX, screen.width))
+        newY = Math.max(0, Math.min(newY, screen.height))
+        newW = Math.min(newW, screen.width - newX)
+        newH = Math.min(newH, screen.height - newY)
+      }
+
+      // For line/arrow/measurement, constrain to axis-aligned with fixed thickness
+      if (activeTool === 'line' || activeTool === 'arrow' || activeTool === 'measurement') {
+        const thickness = 2
+        if (newW >= newH) {
+          // horizontal
+          newH = thickness
+        } else {
+          // vertical
+          newW = thickness
+        }
+      }
+
+      if (snapToGrid) {
+        newX = Math.round(newX / gridSize) * gridSize
+        newY = Math.round(newY / gridSize) * gridSize
+        newW = Math.max(1, Math.round(newW / gridSize) * gridSize)
+        newH = Math.max(1, Math.round(newH / gridSize) * gridSize)
+      }
+
+      // Batch DOM updates using requestAnimationFrame for faster drawing
+      drawingPendingRef.current = { x: newX, y: newY, w: Math.max(1, newW), h: Math.max(1, newH) }
+      if (drawingRafIdRef.current == null) {
+        drawingRafIdRef.current = requestAnimationFrame(() => {
+          const vals = drawingPendingRef.current
+          drawingRafIdRef.current = null
+          if (!vals) return
+          const el = document.getElementById(`comp-${drawingComponentId}`) as HTMLElement | null
+          if (el) {
+            el.style.left = `${vals.x}px`
+            el.style.top = `${vals.y}px`
+            el.style.width = `${vals.w}px`
+            el.style.height = `${vals.h}px`
+          }
+        })
+      }
+    }
+    const onUp = () => {
+      if (!isDrawing || !drawingComponentId || !drawingScreenId) return
+      // Commit final size into state from DOM
+      const el = document.getElementById(`comp-${drawingComponentId}`) as HTMLElement | null
+      if (el) {
+        const x = parseFloat(el.style.left || '0')
+        const y = parseFloat(el.style.top || '0')
+        // Fallback to existing component size instead of 1 if DOM width/height are empty
+        const existingScreen = screens.find(s => s.id === drawingScreenId)
+        const existingComp = existingScreen?.layers.flatMap(l => l.components).find(c => c.id === drawingComponentId)
+        let w = parseFloat(el.style.width || '') || existingComp?.size.width || 1
+        let h = parseFloat(el.style.height || '') || existingComp?.size.height || 1
+        if (snapToGrid) {
+          w = Math.max(1, Math.round(w / gridSize) * gridSize)
+          h = Math.max(1, Math.round(h / gridSize) * gridSize)
+        }
+        updateComponentInScreen(drawingScreenId, drawingComponentId, {
+          position: { x, y },
+          size: { width: Math.max(1, w), height: Math.max(1, h) }
+        })
+      }
+      // Clear any pending frame
+      if (drawingRafIdRef.current != null) {
+        cancelAnimationFrame(drawingRafIdRef.current)
+        drawingRafIdRef.current = null
+      }
+      drawingPendingRef.current = null
+      setIsDrawing(false)
+      setDrawingComponentId(null)
+      setDrawingScreenId(null)
+      // Switch back to select tool like Figma
+      setActiveTool('select')
+    }
+    if (isDrawing) {
+      document.addEventListener('mousemove', onMove)
+      document.addEventListener('mouseup', onUp)
+      return () => {
+        document.removeEventListener('mousemove', onMove)
+        document.removeEventListener('mouseup', onUp)
+      }
+    }
+  }, [isDrawing, drawingComponentId, drawingScreenId, drawingStart.x, drawingStart.y, pan.x, pan.y, zoom, screenPositions, screens, updateComponentInScreen, activeTool, gridSize, snapToGrid])
+
+  // Resize handlers (multi-side)
+  type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+  const resizingDirRef = useRef<ResizeDirection>('se')
+  const resizeLiveBoxRef = useRef<{ x: number; y: number; width: number; height: number }>({ x: 0, y: 0, width: 0, height: 0 })
+  const resizingElementRef = useRef<HTMLElement | null>(null)
+  const resizeScreenPosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
+  const resizeScreenBoundsRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 })
+
+  const handleResizeMouseDown = (e: React.MouseEvent, component: Component, screenId: string, dir: ResizeDirection = 'se') => {
+    e.stopPropagation()
+    setActiveTool('select')
+    setSelectedComponentId(component.id)
+    setRightSidebarVisible(true)
+    setResizingComponentId(component.id)
+    setResizingScreenId(screenId)
+    resizingDirRef.current = dir
+    resizeBaseRef.current = {
+      x: component.position.x,
+      y: component.position.y,
+      width: component.size.width,
+      height: component.size.height
+    }
+    resizeLiveBoxRef.current = { x: component.position.x, y: component.position.y, width: component.size.width, height: component.size.height }
+    document.body.style.userSelect = 'none'
+    // cache screen info and prepare element for fast updates
+    const screenPos = screenPositions[screenId] || { x: 0, y: 0 }
+    resizeScreenPosRef.current = { ...screenPos }
+    const scr = screens.find(s => s.id === screenId)
+    if (scr) resizeScreenBoundsRef.current = { width: scr.width, height: scr.height }
+    const el = document.getElementById(`comp-${component.id}`) as HTMLElement | null
+    resizingElementRef.current = el
+    if (el) {
+      el.style.transition = 'none'
+      el.style.willChange = 'width, height, left, top'
+    }
+  }
+
+  useEffect(() => {
+    if (!resizingComponentId || !resizingScreenId) return
+    const onMove = (e: MouseEvent) => {
+      const rect = canvasRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const screenPos = resizeScreenPosRef.current
+      const mouseX = (e.clientX - rect.left - pan.x) / zoom
+      const mouseY = (e.clientY - rect.top - pan.y) / zoom
+      const base = resizeBaseRef.current
+      const dir = resizingDirRef.current
+      const minSize = 10
+      let newX = base.x
+      let newY = base.y
+      let newW = base.width
+      let newH = base.height
+
+      if (dir.includes('e')) newW = Math.max(minSize, mouseX - screenPos.x - base.x)
+      if (dir.includes('s')) newH = Math.max(minSize, mouseY - screenPos.y - base.y)
+      if (dir.includes('w')) {
+        const proposedX = mouseX - screenPos.x
+        const maxX = base.x + base.width - minSize
+        newX = Math.min(Math.max(0, proposedX), maxX)
+        newW = base.width + (base.x - newX)
+      }
+      if (dir.includes('n')) {
+        const proposedY = mouseY - screenPos.y
+        const maxY = base.y + base.height - minSize
+        newY = Math.min(Math.max(0, proposedY), maxY)
+        newH = base.height + (base.y - newY)
+      }
+
+      const bounds = resizeScreenBoundsRef.current
+      if (bounds.width && bounds.height) {
+        if (dir.includes('e')) newW = Math.min(newW, bounds.width - base.x)
+        if (dir.includes('s')) newH = Math.min(newH, bounds.height - base.y)
+        if (dir.includes('w')) newX = Math.max(0, newX)
+        if (dir.includes('n')) newY = Math.max(0, newY)
+      }
+      resizeLiveBoxRef.current = { x: newX, y: newY, width: newW, height: newH }
+      if (resizeRafIdRef.current == null) {
+        resizeRafIdRef.current = requestAnimationFrame(() => {
+          const el = resizingElementRef.current
+          if (el) {
+            el.style.width = `${resizeLiveBoxRef.current.width}px`
+            el.style.height = `${resizeLiveBoxRef.current.height}px`
+            el.style.left = `${resizeLiveBoxRef.current.x}px`
+            el.style.top = `${resizeLiveBoxRef.current.y}px`
+          }
+          resizeRafIdRef.current = null
+        })
+      }
+    }
+    const onUp = () => {
+      if (resizeRafIdRef.current != null) {
+        cancelAnimationFrame(resizeRafIdRef.current)
+        resizeRafIdRef.current = null
+      }
+      const { x, y, width, height } = resizeLiveBoxRef.current
+      updateComponentInScreen(resizingScreenId!, resizingComponentId!, {
+        position: { x, y },
+        size: { width, height }
+      })
+      if (resizingElementRef.current) {
+        resizingElementRef.current.style.transition = ''
+        resizingElementRef.current.style.willChange = ''
+      }
+      resizingElementRef.current = null
+      setResizingComponentId(null)
+      setResizingScreenId(null)
+      document.body.style.userSelect = 'auto'
+    }
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+    return () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+    }
+  }, [resizingComponentId, resizingScreenId, pan.x, pan.y, zoom, screenPositions, screens, updateComponentInScreen])
+
+  const getDefaultProps = (type: string) => {
+    switch (type) {
+      case 'button':
+        return { text: 'Button', variant: 'primary', color: '#ffffff' }
+      case 'text':
+        return { text: 'Text', fontSize: 16, fontWeight: 'normal' }
+      case 'image':
+        return { src: '', alt: 'Image' }
+      case 'input':
+        return { placeholder: 'Enter text', type: 'text' }
+      case 'container':
+        return { padding: 16, borderRadius: 8 }
+      case 'card':
+        return { padding: 16, shadow: true }
+      case 'ellipse':
+        return { }
+      case 'line':
+        return { lineColor: '#111827', thickness: 2 }
+      case 'arrow':
+        return { lineColor: '#111827', thickness: 2 }
+      case 'measurement':
+        return { lineColor: '#111827', thickness: 2 }
+      case 'polygon':
+        return { sides: 5, lineColor: '#111827', thickness: 1 }
+      case 'star':
+        return { points: 5, innerRatio: 0.5, lineColor: '#111827', thickness: 1 }
+      case 'comment':
+        return { text: 'Comment', color: '#111827' }
+      case 'annotation':
+        return { color: 'rgba(255, 214, 10, 0.25)', borderColor: '#f59e0b', borderWidth: 2 }
+      default:
+        return {}
+    }
+  }
+
+  // Get current screen data
+  const currentScreen = screens.find(s => s.id === activeScreen)
+
+  // Toggle layer expansion
+  const toggleLayerExpansion = (layerId: string) => {
+    setExpandedLayers(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(layerId)) {
+        newSet.delete(layerId)
+      } else {
+        newSet.add(layerId)
+      }
+      return newSet
     })
   }
 
-  const handleCanvasMouseUp = () => {
-    console.log('Canvas mouse up, isDrawing:', isDrawing, 'currentDrawing:', currentDrawing)
-    
-    if (!isDrawing || !currentDrawing) return
-
-    console.log('Finishing drawing for tool:', activeTool)
-
-    // If container tool is active, show add screen popup
-    if (activeTool === 'container') {
-      console.log('Showing screen selector for container')
-      setShowScreenSelector(true)
-      setIsDrawing(false)
-      setCurrentDrawing(null)
-      setActiveTool('select')
-      return
+  // Color utilities for right sidebar color controls
+  const getColorSpaceFromString = (val?: string): 'srgb' | 'p3' => {
+    if (!val) return 'srgb'
+    return /^color\(display-p3/i.test(val) ? 'p3' : 'srgb'
+  }
+  const parseHex = (hex?: string): { r: number; g: number; b: number } | null => {
+    if (!hex) return null
+    const h = hex.replace('#', '')
+    if (h.length === 3) {
+      const r = parseInt(h[0] + h[0], 16)
+      const g = parseInt(h[1] + h[1], 16)
+      const b = parseInt(h[2] + h[2], 16)
+      return { r, g, b }
     }
-
-    // Convert drawing to component
-    const component: Component = {
-      id: currentDrawing.id,
-      name: `${activeTool.charAt(0).toUpperCase() + activeTool.slice(1)} ${Date.now()}`,
-      type: activeTool,
-      position: { x: currentDrawing.x, y: currentDrawing.y },
-      size: { width: Math.max(currentDrawing.width, 20), height: Math.max(currentDrawing.height, 20) },
-      backgroundColor: '#3b82f6',
-      zIndex: 1,
-      props: {}
+    if (h.length === 6) {
+      const r = parseInt(h.slice(0, 2), 16)
+      const g = parseInt(h.slice(2, 4), 16)
+      const b = parseInt(h.slice(4, 6), 16)
+      return { r, g, b }
     }
+    return null
+  }
+  const parseRgba = (css?: string): { r: number; g: number; b: number; a: number } | null => {
+    if (!css) return null
+    const m = css.match(/rgba?\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*(\d*\.?\d+))?\)/i)
+    if (!m) return null
+    return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]), a: m[4] !== undefined ? Number(m[4]) : 1 }
+  }
+  const parseP3 = (css?: string): { r: number; g: number; b: number; a: number } | null => {
+    if (!css) return null
+    const m = css.match(/color\(display-p3\s+([0-9]*\.?[0-9]+)\s+([0-9]*\.?[0-9]+)\s+([0-9]*\.?[0-9]+)(?:\s*\/\s*([0-9]*\.?[0-9]+))?\)/i)
+    if (!m) return null
+    return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]), a: m[4] !== undefined ? Number(m[4]) : 1 }
+  }
+  const rgbToHex = (r: number, g: number, b: number) => {
+    const to = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0')
+    return `#${to(r)}${to(g)}${to(b)}`
+  }
+  const buildSrgbCss = (hex: string, alpha: number) => {
+    const rgb = parseHex(hex) || { r: 255, g: 255, b: 255 }
+    const a = Math.max(0, Math.min(1, alpha))
+    return a < 1 ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${a})` : hex
+  }
+  const buildP3Css = (r01: number, g01: number, b01: number, a: number) => {
+    const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
+    return `color(display-p3 ${clamp01(r01)} ${clamp01(g01)} ${clamp01(b01)} / ${Math.max(0, Math.min(1, a))})`
+  }
 
-    // Add component to active screen
-    if (activeScreen) {
-      addComponent(component)
-    }
-
-    setIsDrawing(false)
-    setCurrentDrawing(null)
-    setActiveTool('select')
+  // Zoom controls
+  const zoomIn = () => setZoom(prev => Math.min(prev * 1.2, 3))
+  const zoomOut = () => setZoom(prev => Math.max(prev * 0.8, 0.1))
+  const resetView = () => {
+    setZoom(1)
+    setPan({ x: 0, y: 0 })
   }
 
   return (
     <div className="h-screen flex bg-gray-50 font-['Inter'] font-semibold">
-      {/* Loading Indicator */}
-      {isLoadingData && (
-        <div className="fixed inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-            <p className="text-gray-600 font-medium">Loading design data...</p>
-            <p className="text-sm text-gray-500 mt-2">Please wait while we load your project</p>
-          </div>
-        </div>
-      )}
-      
-      {/* Left Panel - Library & Layers & Variables & Screens */}
-      {sidebarVisible && (
-        <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-          {/* Top Section - Project Name & Tabs */}
-          <div className="p-4 border-b border-gray-200">
-            {/* Project Name */}
-            <div className="flex items-center space-x-2 mb-3">
-              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                <span className="text-xs font-bold text-white">C</span>
-              </div>
-              <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900">
-                  {loadingProject ? 'Loading...' : (projectInfo?.name || 'Untitled')}
-              </div>
-                <div className="text-xs text-gray-500">
-                  {projectInfo ? `${projectInfo.language} • ${projectInfo.device}` : 'Drafts'}
-                </div>
-              </div>
-              <button 
-                onClick={() => setSidebarVisible(false)}
-                className="text-gray-400 hover:text-gray-600"
-                title="Hide sidebar"
+      {/* Left Sidebar */}
+      {leftSidebarVisible && !isFullScreen && (
+        <div className="w-80 bg-white border-r border-gray-200 flex flex-col min-h-0">
+          <div className="flex items-center justify-between p-3 border-b border-gray-200">
+            <div className="flex items-center space-x-2">
+              <Link
+                to="/user-dashboard"
+                className="inline-flex items-center px-2 py-1 text-xs text-gray-500 hover:text-gray-700 rounded"
+                title="Back to User Dashboard"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
-              </button>
+                <span className="ml-1">Back</span>
+              </Link>
+            <h2 className="text-sm font-semibold text-gray-900">Design Tools</h2>
             </div>
-            
-            {/* File/Assets Tabs */}
-            <div className="flex bg-gray-100 rounded-lg p-1">
-              <button 
-                onClick={() => setActiveTab('file')}
-                className={`flex-1 text-xs py-2 px-3 rounded-md transition-colors ${
-                  activeTab === 'file' 
-                    ? 'bg-white text-gray-900 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                File
-              </button>
-              <button 
-                onClick={() => setActiveTab('assets')}
-                className={`flex-1 text-xs py-2 px-3 rounded-md transition-colors ${
-                  activeTab === 'assets' 
-                    ? 'bg-white text-gray-900 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                Assets
-              </button>
+            <button
+              onClick={() => setLeftSidebarVisible(false)}
+              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto pb-24">
+            {/* Screens Section */}
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Screens</h3>
+              <p className="text-xs text-gray-500 mb-3">Manage your app screens</p>
+              
+              <div className="relative mb-3">
+                <button
+                  onClick={() => setShowScreenPresets(!showScreenPresets)}
+                  className="w-full flex items-center space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <Plus size={16} className="text-gray-600" />
+                  <span className="text-sm font-medium text-gray-900">Add Screen</span>
+                </button>
+                
+                {showScreenPresets && (
+                  <div className="absolute left-0 top-12 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-2 w-full">
+                    {SCREEN_PRESETS.map((preset) => (
+                      <button
+                        key={preset.name}
+                        onClick={() => handleAddScreen(preset)}
+                        className="w-full flex items-center space-x-2 p-2 rounded hover:bg-gray-100 text-left"
+                      >
+                        <preset.icon size={16} className="text-gray-600" />
+                        <div className="flex-1">
+                          <div className="text-sm text-gray-700">{preset.name}</div>
+                          <div className="text-xs text-gray-500">{preset.width} × {preset.height}</div>
+            </div>
+                      </button>
+                    ))}
+            </div>
+                )}
+          </div>
+              
+                              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {screens.map((screen) => (
+                  <div
+                    key={screen.id}
+                    className={`group p-3 rounded-lg transition-colors ${
+                      activeScreen === screen.id
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'hover:bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    <div 
+                      onClick={() => setActiveScreen(screen.id)}
+                      onDoubleClick={() => {
+                        setActiveScreen(screen.id)
+                        setHighlightedScreenId(screen.id)
+                        setTimeout(() => setHighlightedScreenId(prev => (prev === screen.id ? null : prev)), 800)
+                      }}
+                      className="flex items-center justify-between cursor-pointer"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <Smartphone size={14} />
+                        {editingScreenId === screen.id ? (
+                          <input
+                            autoFocus
+                            className="text-sm font-medium truncate px-1 py-0.5 border border-blue-300 rounded outline-none"
+                            value={editingScreenName}
+                            onChange={(e) => setEditingScreenName(e.target.value)}
+                            onBlur={() => {
+                              const newName = editingScreenName.trim()
+                              if (newName && newName !== screen.name) {
+                                updateScreen(screen.id, { name: newName })
+                              }
+                              setEditingScreenId(null)
+                              setEditingScreenName('')
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                (e.target as HTMLInputElement).blur()
+                              } else if (e.key === 'Escape') {
+                                setEditingScreenId(null)
+                                setEditingScreenName('')
+                              }
+                            }}
+                          />
+                        ) : (
+                          <span
+                            className="text-sm font-medium truncate"
+                            onDoubleClick={(e) => {
+                              e.stopPropagation()
+                              setEditingScreenId(screen.id)
+                              setEditingScreenName(screen.name)
+                            }}
+                            title="Double-click to rename"
+                          >
+                            {screen.name}
+                          </span>
+                        )}
+          </div>
+                      {screens.length > 1 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (window.confirm(`Delete screen "${screen.name}"?`)) {
+                              deleteScreen(screen.id)
+                            }
+                          }}
+                          className="p-1 rounded hover:bg-red-100 text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Delete Screen"
+                        >
+                          <Trash2 size={12} />
+            </button>
+                      )}
+          </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {screen.width} × {screen.height}
+          </div>
+              </div>
+                ))}
             </div>
           </div>
 
-          {/* Content Area */}
-          <div className="flex-1 overflow-y-auto">
-            {activeTab === 'file' && (
-              <>
-                {/* Screens Section */}
-                <div className="p-4 border-b border-gray-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-medium text-gray-900">Screens</h3>
-                    <div className="relative">
-                      <button 
-                        onClick={() => setShowScreenSelector(!showScreenSelector)}
-                        className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 shadow-sm hover:shadow-md screen-selector"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
-                        <span>Add Screen</span>
-                      </button>
+            {/* Layers Section (moved up) */}
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                <Layers size={16} className="text-gray-600" />
+                <h3 className="text-sm font-semibold text-gray-900">Layers</h3>
+          </div>
+                <button
+                  onClick={() => {
+                    if (!currentScreen) return
+                    const newLayer = { id: `layer-${Date.now()}`, name: `Layer ${currentScreen.layers.length + 1}`, visible: true, locked: false, components: [] }
+                    updateScreen(currentScreen.id, { layers: [...currentScreen.layers, newLayer] })
+                  }}
+                  className="text-xs px-2 py-1 bg-gray-100 rounded hover:bg-gray-200"
+                >
+                  + Layer
+                        </button>
+          </div>
                       
-                      {/* Screen Type Selector Dropdown */}
-                      {showScreenSelector && (
-                        <div className="fixed left-64 top-20 w-80 bg-white border border-gray-200 rounded-lg shadow-xl z-50 overflow-hidden screen-selector">
-                          <div className="p-4">
-                            <div className="flex items-center justify-between mb-4">
-                              <h3 className="text-sm font-medium text-gray-900">Add Screen</h3>
-                              <button
-                                onClick={() => setShowScreenSelector(false)}
-                                className="text-gray-400 hover:text-gray-600 p-1 rounded"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
-                            </div>
-                            
-                            {/* Helpful message about positioning */}
-                            {activeScreen && screens.length > 0 && (
-                              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                <div className="flex items-center space-x-2">
-                                  <svg className="w-4 h-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  </svg>
-                                  <div className="text-xs text-blue-700">
-                                    <div className="font-medium">New screen will be positioned beside:</div>
-                                    <div className="text-blue-600">
-                                      {screens.find(s => s.id === activeScreen)?.name || 'Active screen'}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                            
-                            <div className="space-y-4 max-h-96 overflow-y-auto">
-                              {/* iOS Devices */}
-                              <div>
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                                  <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">iOS</h4>
-                                </div>
-                                <div className="space-y-1">
-                                  {screenPresets.filter(preset => preset.category === 'iOS').map((preset) => (
-                            <button
-                                      key={preset.name}
-                                      className="w-full text-left p-2 hover:bg-gray-50 rounded text-xs"
-                              onClick={() => {
-                                createScreenWithPosition({
-                                          name: preset.name,
-                                          width: preset.width,
-                                          height: preset.height,
-                                          type: preset.type
-                                })
-                                setShowScreenSelector(false)
-                              }}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-2">
-                                          <preset.icon className="w-4 h-4 text-gray-500" />
-                                          <div>
-                                            <div className="font-medium text-gray-900">{preset.name}</div>
-                                            <div className="text-gray-500">{preset.description}</div>
-                                          </div>
-                                        </div>
-                                        <div className="text-right">
-                                          <div className="text-gray-500">{preset.width}×{preset.height}</div>
-                                          <div className="text-gray-400">{preset.ratio}</div>
-                                        </div>
-                                      </div>
-                            </button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Android Devices */}
-                              <div>
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                                  <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Android</h4>
-                                </div>
-                                <div className="space-y-1">
-                                  {screenPresets.filter(preset => preset.category === 'Android').map((preset) => (
-                              <button
-                                key={preset.name}
-                                      className="w-full text-left p-2 hover:bg-gray-50 rounded text-xs"
-                                onClick={() => {
-                                  createScreenWithPosition({
-                                    name: preset.name,
-                                    width: preset.width,
-                                    height: preset.height,
-                                    type: preset.type
-                                  })
-                                  setShowScreenSelector(false)
-                                }}
-                              >
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-2">
-                                <preset.icon className="w-4 h-4 text-gray-500" />
-                                          <div>
-                                            <div className="font-medium text-gray-900">{preset.name}</div>
-                                            <div className="text-gray-500">{preset.description}</div>
-                                          </div>
-                                        </div>
-                                        <div className="text-right">
-                                          <div className="text-gray-500">{preset.width}×{preset.height}</div>
-                                          <div className="text-gray-400">{preset.ratio}</div>
-                                        </div>
-                                      </div>
-                              </button>
-                            ))}
-                                </div>
-                              </div>
-
-                              {/* Desktop */}
-                              <div>
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-                                  <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Desktop</h4>
-                                </div>
-                                <div className="space-y-1">
-                                  {screenPresets.filter(preset => preset.category === 'Desktop').map((preset) => (
-                                    <button
-                                      key={preset.name}
-                                      className="w-full text-left p-2 hover:bg-gray-50 rounded text-xs"
-                                      onClick={() => {
-                                        createScreenWithPosition({
-                                          name: preset.name,
-                                          width: preset.width,
-                                          height: preset.height,
-                                          type: preset.type
-                                        })
-                                        setShowScreenSelector(false)
-                                      }}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-2">
-                                          <preset.icon className="w-4 h-4 text-gray-500" />
-                                          <div>
-                                            <div className="font-medium text-gray-900">{preset.name}</div>
-                                            <div className="text-gray-500">{preset.description}</div>
-                                          </div>
-                                        </div>
-                                        <div className="text-right">
-                                          <div className="text-gray-500">{preset.width}×{preset.height}</div>
-                                          <div className="text-gray-400">{preset.ratio}</div>
-                                        </div>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              {/* Custom */}
-                              <div>
-                                <div className="flex items-center space-x-2 mb-2">
-                                  <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-                                  <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide">Custom</h4>
-                                </div>
-                                <div className="space-y-1">
-                                  {screenPresets.filter(preset => preset.category === 'Custom').map((preset) => (
-                                    <button
-                                      key={preset.name}
-                                      className="w-full text-left p-2 hover:bg-gray-50 rounded text-xs"
-                                      onClick={() => {
-                                        createScreenWithPosition({
-                                          name: preset.name,
-                                          width: preset.width,
-                                          height: preset.height,
-                                          type: preset.type
-                                        })
-                                        setShowScreenSelector(false)
-                                      }}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center space-x-2">
-                                          <preset.icon className="w-4 h-4 text-gray-500" />
-                                          <div>
-                                            <div className="font-medium text-gray-900">{preset.name}</div>
-                                            <div className="text-gray-500">{preset.description}</div>
-                                          </div>
-                                        </div>
-                                        <div className="text-right">
-                                          <div className="text-gray-500">{preset.width}×{preset.height}</div>
-                                          <div className="text-gray-400">{preset.ratio}</div>
-                                        </div>
-                                      </div>
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+              <div className="max-h-64 overflow-y-auto pr-1">
+                {/* Flat list per screen: front-to-back ordering (top = front) with drag to reorder or nest */}
+                {screens.map((scr) => (
+                  <div key={`layers-${scr.id}`} className={`mb-4 rounded-lg border ${activeScreen === scr.id ? 'border-blue-300 bg-blue-50/30' : 'border-gray-200 bg-white'}`}>
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-gray-200">
+                      <button onClick={() => setActiveScreen(scr.id)} className="text-xs font-medium text-gray-700 hover:text-gray-900">
+                        {scr.name}
+                      </button>
+                      <div className="text-[11px] text-gray-400">Components</div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    {screens.length === 0 ? (
-                      <div className="text-center py-6 text-gray-400">
-                        <svg className="w-8 h-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                        </svg>
-                        <p className="text-xs">No screens yet</p>
-                        <p className="text-xs text-gray-500">Add a screen to get started</p>
-                      </div>
-                    ) : (
-                      screens.map((screen, index) => {
-                        const { defaultX, defaultY } = calculateScreenPosition(index, screen)
-                        const currentPosition = screenPositions[screen.id] || { x: 0, y: 0 }
-                        const actualX = currentPosition.x + defaultX
-                        const actualY = currentPosition.y + defaultY
-                        
-                        return (
+                    <div className="p-2"
+                         onDragOver={(e) => e.preventDefault()}
+                         onDrop={(e) => {
+                           e.preventDefault()
+                           try {
+                             const data = JSON.parse(e.dataTransfer.getData('application/json'))
+                             if (data.kind !== 'component') return
+                             const { componentId: draggedId, screenId: fromScreenId } = data
+                             const fromScreen = screens.find(s => s.id === fromScreenId)
+                             const sourceComp = fromScreen?.layers.flatMap(l => l.components).find(c => c.id === draggedId)
+                             if (!sourceComp) return
+                             const targetScreen = scr
+                             if (fromScreen && fromScreen.id === targetScreen.id) {
+                               // Move within same screen: compute new layers in memory, then commit once
+                               const removed = removeComponentFromScreen(targetScreen, draggedId)
+                               const withAdded = addComponentToLayer({ ...targetScreen, layers: removed }, { ...sourceComp }, targetScreen.activeLayer)
+                               const newOrderIds = [ draggedId, ...getCombinedComponents({ ...targetScreen, layers: withAdded }).filter(c => c.id !== draggedId).map(c => c.id) ]
+                               updateScreen(targetScreen.id, { layers: applyZOrder({ ...targetScreen, layers: withAdded }, newOrderIds) })
+                             } else {
+                               // Cross-screen move: update source first, then target
+                               if (fromScreen) {
+                                 const newSourceLayers = removeComponentFromScreen(fromScreen, draggedId)
+                                 const newSourceOrder = getCombinedComponents({ ...fromScreen, layers: newSourceLayers }).map(c => c.id)
+                                 updateScreen(fromScreen.id, { layers: applyZOrder({ ...fromScreen, layers: newSourceLayers }, newSourceOrder) })
+                               }
+                               const withAdded = addComponentToLayer(targetScreen, { ...sourceComp }, targetScreen.activeLayer)
+                               const newOrderIds = [ draggedId, ...getCombinedComponents({ ...targetScreen, layers: withAdded }).filter(c => c.id !== draggedId).map(c => c.id) ]
+                               updateScreen(targetScreen.id, { layers: applyZOrder({ ...targetScreen, layers: withAdded }, newOrderIds) })
+                             }
+                           } catch {}
+                         }}
+                    >
+                      {(() => {
+                        const combined = getCombinedComponents(scr)
+                          .slice()
+                          .sort((a, b) => (b.zIndex || 0) - (a.zIndex || 0))
+                        if (combined.length === 0) {
+                          return <div className="text-xs text-gray-400 px-2 py-1">No components</div>
+                        }
+                        return combined.map((component) => (
                           <div
-                            key={screen.id}
-                            className={`group relative bg-white border rounded-lg p-3 cursor-pointer transition-all duration-200 ${
-                              activeScreen === screen.id 
-                                ? 'ring-2 ring-blue-500 border-blue-300 bg-blue-50' 
-                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                            key={component.id}
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData('application/json', JSON.stringify({ kind: 'component', componentId: component.id, screenId: scr.id }))
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault()
+                              const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect()
+                              const y = e.clientY
+                              const before = y < rect.top + rect.height / 3
+                              const after = y > rect.bottom - rect.height / 3
+                              const inside = !before && !after
+                              setLayerDragPreview({ screenId: scr.id, targetId: component.id, position: before ? 'before' : after ? 'after' : 'inside' })
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              try {
+                                const data = JSON.parse(e.dataTransfer.getData('application/json'))
+                                if (data.kind !== 'component') return
+                                const { componentId: draggedId, screenId: fromScreenId } = data
+                                const targetId = component.id
+                                const preview = layerDragPreview
+                                const before = preview && preview.targetId === targetId && preview.position === 'before'
+                                const after = preview && preview.targetId === targetId && preview.position === 'after'
+                                const inside = preview && preview.targetId === targetId && preview.position === 'inside'
+                                const fromScreen = screens.find(s => s.id === fromScreenId)
+                                const sourceComp = fromScreen?.layers.flatMap(l => l.components).find(c => c.id === draggedId)
+                                if (!sourceComp) return
+                                if (inside && component.type === 'container') {
+                                  // Move dragged to be a child of target container
+                                  if (fromScreen) {
+                                    const newSourceLayers = removeComponentFromScreen(fromScreen, draggedId)
+                                    updateScreen(fromScreen.id, { layers: newSourceLayers })
+                                  }
+                                  addChildComponentInScreen(scr.id, targetId, { ...sourceComp })
+                                  return
+                                }
+                                if (fromScreen && fromScreen.id !== scr.id) {
+                                  // remove from source screen
+                                  const newSourceLayers = removeComponentFromScreen(fromScreen, draggedId)
+                                  const newSourceOrder = getCombinedComponents({ ...fromScreen, layers: newSourceLayers }).map(c => c.id)
+                                  updateScreen(fromScreen.id, { layers: applyZOrder({ ...fromScreen, layers: newSourceLayers }, newSourceOrder) })
+                                  // insert into target screen
+                                  const currentOrderIds = getCombinedComponents(scr).map(c => c.id).filter(id => id !== draggedId)
+                                  const targetIndex = currentOrderIds.findIndex(id => id === targetId)
+                                  const insertIndex = targetIndex === -1 ? 0 : (before ? targetIndex : after ? targetIndex + 1 : targetIndex)
+                                  currentOrderIds.splice(insertIndex, 0, draggedId)
+                                  updateScreen(scr.id, { layers: applyZOrder(scr, currentOrderIds) })
+                                } else {
+                                  // within same screen reorder
+                                  const currentOrderIds = getCombinedComponents(scr).map(c => c.id)
+                                  const filtered = currentOrderIds.filter(id => id !== draggedId)
+                                  const targetIndex = filtered.findIndex(id => id === targetId)
+                                  if (targetIndex === -1) return
+                                  const insertIndex = before ? targetIndex : after ? targetIndex + 1 : targetIndex
+                                  filtered.splice(insertIndex, 0, draggedId)
+                                  updateScreen(scr.id, { layers: applyZOrder(scr, filtered) })
+                                }
+                              } catch {}
+                              setLayerDragPreview(null)
+                            }}
+                            onDragLeave={() => { setLayerDragPreview(null) }}
+                            className={`flex items-center space-x-2 px-2 py-1 rounded cursor-move text-xs ${
+                              selectedComponent?.id === component.id ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-100 text-gray-700'
                             }`}
-                            onClick={() => {
-                              if (!isPanning && !draggedScreen) {
-                                setActiveScreen(screen.id)
-                              }
-                            }}
-                            onDoubleClick={() => {
-                              // Navigate to the screen on canvas
-                              const canvasContainer = document.querySelector('.flex-1.bg-gray-100.overflow-hidden.relative') as HTMLElement
-                              if (canvasContainer) {
-                                const canvasRect = canvasContainer.getBoundingClientRect()
-                                const containerWidth = canvasRect.width
-                                const containerHeight = canvasRect.height
-                                
-                                const centerX = actualX + screen.width / 2
-                                const centerY = actualY + screen.height / 2
-                                
-                                const newPanX = containerWidth / 2 - centerX
-                                const newPanY = containerHeight / 2 - centerY
-                                
-                                setPan({ x: newPanX, y: newPanY })
-                                setZoom(1)
-                              }
-                            }}
+                            onClick={() => { setSelectedComponentId(component.id); setRightSidebarVisible(true) }}
                           >
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1 min-w-0">
-                                {/* Screen Name with Inline Editing */}
-                                <div className="flex items-center space-x-2 mb-2">
-                                  {/* Active Screen Indicator */}
-                                  {activeScreen === screen.id && (
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
-                                  )}
-                                  
-                                  <div className="flex-1 min-w-0">
-                                    <input
-                                      type="text"
-                                      value={screen.name}
-                                      onChange={(e) => updateScreen(screen.id, { name: e.target.value })}
-                                      className={`w-full text-sm font-medium bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white px-2 py-1 rounded min-w-0 truncate ${
-                                        activeScreen === screen.id ? 'text-blue-700 font-semibold' : 'text-gray-900'
-                                      }`}
-                                      onClick={(e) => e.stopPropagation()}
-                                      onDoubleClick={(e) => e.stopPropagation()}
-                                      placeholder="Screen name"
-                                    />
-                                  </div>
-                                  
-                                  {/* Screen Type Badge */}
-                                  <span className={`px-2 py-1 text-xs rounded-full capitalize flex-shrink-0 ${
-                                    screen.type === 'mobile' ? 'bg-blue-100 text-blue-700' :
-                                    screen.type === 'tablet' ? 'bg-green-100 text-green-700' :
-                                    screen.type === 'desktop' ? 'bg-purple-100 text-purple-700' :
-                                    'bg-gray-100 text-gray-700'
-                                  }`}>
-                                    {screen.type}
-                                  </span>
-                                </div>
-                                  
-                                  {/* Screen Dimensions */}
-                                <div className="flex items-center justify-between">
-                                  <span className="text-xs text-gray-500">
-                                    {screen.width}×{screen.height}
-                                  </span>
-                                  
-                                  {/* Component Count */}
-                                  <span className="text-xs text-gray-400">
-                                    {screen.layers.reduce((total, layer) => total + layer.components.length, 0)} components
-                                  </span>
-                                </div>
-                                
-                                {/* Tags Section */}
-                                <div className="flex items-center space-x-1 mt-1">
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      const tag = prompt('Enter a tag for this screen:')
-                                      if (tag && tag.trim()) {
-                                        // Add tag functionality here
-                                        console.log('Adding tag:', tag, 'to screen:', screen.id)
-                                      }
-                                    }}
-                                    className="text-xs text-gray-400 hover:text-gray-600 flex items-center space-x-1"
-                                  >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                                    </svg>
-                                    <span>Add Tag</span>
-                                  </button>
-                                </div>
-                              </div>
-                              
-                              {/* Action Buttons */}
-                              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                {/* Edit Button */}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    // Focus on the name input
-                                    const input = e.currentTarget.parentElement?.parentElement?.querySelector('input')
-                                    if (input) {
-                                      input.focus()
-                                      input.select()
-                                    }
-                                  }}
-                                  className="text-gray-400 hover:text-gray-600 p-1"
-                                  title="Edit screen name"
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                  </svg>
-                                </button>
-                                
-                                {/* Delete Button */}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    if (screens.length <= 1) {
-                                      alert('Cannot delete the last screen')
-                                      return
-                                    }
-                                    if (window.confirm(`Delete "${screen.name}"?`)) {
-                                      deleteActiveScreen()
-                                    }
-                                  }}
-                                  className={`text-gray-400 hover:text-red-500 p-1 ${
-                                    screens.length <= 1 ? 'opacity-50 cursor-not-allowed' : ''
-                                  }`}
-                                  disabled={screens.length <= 1}
-                                  title={screens.length <= 1 ? 'Cannot delete the last screen' : 'Delete screen'}
-                                >
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                  </svg>
-                                </button>
-                              </div>
+                            <div className="relative w-full flex items-center space-x-2">
+                              {/* Tracker lines */}
+                              {layerDragPreview && layerDragPreview.screenId === scr.id && layerDragPreview.targetId === component.id && layerDragPreview.position === 'before' && (
+                                <div className="absolute -top-0.5 left-0 right-0 h-0.5 bg-black rounded" />
+                              )}
+                              {layerDragPreview && layerDragPreview.screenId === scr.id && layerDragPreview.targetId === component.id && layerDragPreview.position === 'after' && (
+                                <div className="absolute -bottom-0.5 left-0 right-0 h-0.5 bg-black rounded" />
+                              )}
+                              {layerDragPreview && layerDragPreview.screenId === scr.id && layerDragPreview.targetId === component.id && layerDragPreview.position === 'inside' && (
+                                <div className="absolute inset-0 ring-1 ring-black/60 rounded pointer-events-none" />
+                              )}
+                              <Square size={12} className="text-gray-500 flex-shrink-0" />
+                              <span className="truncate flex-1">{component.name}</span>
+                              <span className="text-[10px] text-gray-400">{component.type}</span>
                             </div>
                           </div>
-                        )
-                      })
-                    )}
-                  </div>
-                </div>
+                        ))
+                      })()}
+            </div>
+          </div>
+                  ))}
+            </div>
+              </div>
+            </div>
 
-                {/* Layers Section */}
-                <div className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-medium text-gray-900">Layers</h3>
-                    <button className="text-gray-400 hover:text-gray-600">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                      </svg>
-                    </button>
-                  </div>
-                  
-                  <div className="space-y-1">
-                    {activeScreen && screens.find(s => s.id === activeScreen)?.layers.map((layer) => (
-                      <div key={layer.id} className="group">
-                        {/* Layer Header */}
-                        <div className="flex items-center space-x-2 py-1 px-2 rounded hover:bg-gray-100">
-                          <button className="text-gray-400 hover:text-gray-600">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-                          <div className="w-4 h-4 bg-gray-300 rounded flex items-center justify-center">
-                            <svg className="w-3 h-3 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                            </svg>
-                          </div>
-                          <span className="text-xs text-gray-700 flex-1 text-left">{layer.name}</span>
-                          <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100">
-                            <button 
-                              className={`${layer.visible ? 'text-gray-600' : 'text-gray-400'} hover:text-gray-600`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                const screen = screens.find(s => s.id === activeScreen)
-                                if (screen) {
-                                  const updatedLayers = screen.layers.map(l => 
-                                    l.id === layer.id ? { ...l, visible: !l.visible } : l
-                                  )
-                                  updateScreen(screen.id, { layers: updatedLayers })
-                                }
-                              }}
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                            </button>
-                            <button 
-                              className={`${layer.locked ? 'text-gray-600' : 'text-gray-400'} hover:text-gray-600`}
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                const screen = screens.find(s => s.id === activeScreen)
-                                if (screen) {
-                                  const updatedLayers = screen.layers.map(l => 
-                                    l.id === layer.id ? { ...l, locked: !l.locked } : l
-                                  )
-                                  updateScreen(screen.id, { layers: updatedLayers })
-                                }
-                              }}
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                              </svg>
-                            </button>
-                          </div>
+            {/* Components Library (moved down) */}
+            <div className="p-4 border-t border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Components</h3>
+              <p className="text-xs text-gray-500 mb-2">Drag components to canvas</p>
+              {/* Component search */}
+              <div className="mb-2 relative">
+                <div className="flex items-center bg-gray-50 border border-gray-200 rounded px-2 py-1 focus-within:ring-2 focus-within:ring-blue-200">
+                  <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  <input
+                    type="text"
+                    value={componentSearchQuery}
+                    onChange={(e) => setComponentSearchQuery(e.target.value)}
+                    placeholder="Search built-ins or npm…"
+                    className="flex-1 px-2 py-1 text-sm bg-transparent outline-none"
+                  />
+                  {isSearchingComponents && (
+                    <svg className="animate-spin h-4 w-4 text-gray-400" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                  )}
+                </div>
+                {/* Remote results dropdown with drag support and preview */}
+                {componentSearchQuery.trim().length >= 2 && remoteComponentResults.length > 0 && (
+                  <div className="absolute z-50 mt-1 left-0 right-0 bg-white border border-gray-200 rounded-md shadow-lg max-h-56 overflow-y-auto">
+                    {remoteComponentResults.map((pkg) => (
+                      <div
+                        key={pkg.name}
+                        className="px-3 py-2 hover:bg-gray-50 cursor-move flex items-center space-x-2"
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('application/json', JSON.stringify({ type: 'component', componentType: 'external', packageName: pkg.name, packageLink: pkg.link }))
+                        }}
+                        onClick={() => addExternalComponentToActiveScreen(pkg.name, { package: pkg.name, link: pkg.link })}
+                      >
+                        <div className="w-8 h-6 bg-gray-100 rounded overflow-hidden flex-shrink-0 flex items-center justify-center">
+                          {remoteComponentPreviews[pkg.name]
+                            ? <img src={remoteComponentPreviews[pkg.name]} alt="preview" className="max-w-full max-h-full" />
+                            : <div className="text-[10px] text-gray-400">UI</div>
+                          }
                         </div>
-                        
-                        {/* Components in Layer */}
-                        <div className="ml-6 space-y-1">
-                          {layer.components.map((component) => (
-                            <div 
-                              key={component.id}
-                              className={`flex items-center space-x-2 py-1 px-2 rounded text-xs ${
-                                selectedComponent?.id === component.id 
-                                  ? 'bg-blue-100 text-blue-900' 
-                                  : 'text-gray-600 hover:bg-gray-100'
-                              }`}
-                              onClick={() => setSelectedComponent(component)}
-                            >
-                              <div className="w-3 h-3 bg-gray-400 rounded"></div>
-                              <span className="flex-1 truncate">{component.type}</span>
-                              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100">
-                                <button className="text-gray-400 hover:text-gray-600">
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                  </svg>
-                                </button>
-                                <button className="text-gray-400 hover:text-gray-600">
-                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium text-gray-900 truncate">{pkg.name}</div>
+                          {pkg.description && <div className="text-[11px] text-gray-500 truncate">{pkg.description}</div>}
                         </div>
                       </div>
                     ))}
+                    <div className="px-3 py-2 text-[11px] text-gray-400 border-t">Results from npm registry</div>
                   </div>
-                </div>
-              </>
-            )}
-
-            {activeTab === 'assets' && (
-              <div className="p-4 space-y-6">
-                {/* UI Components Section */}
-                <div>
-                  <div className="mb-4 cursor-pointer hover:bg-gray-50 p-3 rounded-xl transition-all duration-200 border border-transparent hover:border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                          <Layout className="h-5 w-5 text-white" />
-                        </div>
-                        <div>
-                          <h3 className="text-base font-bold text-gray-900">UI Components</h3>
-                          <p className="text-sm text-gray-500">Essential building blocks</p>
-                        </div>
-                      </div>
-                      <ChevronDown 
-                        className={`h-5 w-5 text-gray-400 transition-transform duration-200 ${
-                          sidebarStates.library ? 'rotate-0' : '-rotate-90'
-                        }`}
-                      />
+                )}
+              </div>
+              <div className="space-y-2 h-64 overflow-y-auto pr-1">
+                    {COMPONENT_LIBRARY.filter(c =>
+                  c.name.toLowerCase().includes(componentSearchQuery.toLowerCase()) ||
+                  c.type.toLowerCase().includes(componentSearchQuery.toLowerCase())
+                ).map((component) => (
+                  <div
+                    key={component.type}
+                    draggable
+                        onDragStart={(e) => handleComponentDragStart(e, component.type)}
+                    onDragEnd={handleComponentDragEnd}
+                    className="w-full flex items-center space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-move"
+                  >
+                    <div className={`w-6 h-6 rounded flex items-center justify-center ${component.type === 'button' ? 'bg-red-500' : 'bg-blue-500'}`}>
+                      <component.icon size={14} className="text-white" />
+                    </div>
+                    <div className="text-left">
+                      <div className="text-sm font-medium text-gray-900">{component.name}</div>
+                      <div className="text-xs text-gray-500">UI Component</div>
                     </div>
                   </div>
-                  
-                  {sidebarStates.library && (
-                    <div className="space-y-4">
-                      {/* Basic Elements */}
-                      <div>
-                        <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3 px-1">Basic Elements</h4>
-                        <div className="grid grid-cols-1 gap-2">
-                          {componentLibrary.slice(0, 6).map((component) => (
-                            <button
-                              key={component.type}
-                              onClick={() => addComponentToCanvas(component.type)}
-                              draggable
-                              onDragStart={(e) => handleLibraryDragStart(e, component.type)}
-                              onDragEnd={handleLibraryDragEnd}
-                              className="group relative bg-white border border-gray-200 rounded-lg p-2 hover:border-blue-300 hover:shadow-md hover:shadow-blue-100 transition-all duration-200 cursor-grab active:cursor-grabbing"
-                            >
-                              {/* Component Preview */}
-                              <div className="w-full h-12 mb-2 rounded border border-gray-100 overflow-hidden bg-gradient-to-br from-gray-50 to-white shadow-sm">
-                                {renderComponentPreview(component.type)}
-                              </div>
-                              
-                              {/* Component Info */}
-                              <div className="flex items-center space-x-2">
-                                <div className="w-6 h-6 bg-gray-100 rounded-md flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                                  <component.icon className="h-3 w-3 text-gray-600 group-hover:text-blue-600" />
-                                </div>
-                                <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">{component.name}</span>
-                              </div>
-                              
-                              {/* Hover Effect */}
-                              <div className="absolute inset-0 bg-blue-500 bg-opacity-0 group-hover:bg-opacity-5 rounded-xl transition-all duration-200 pointer-events-none" />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+                ))}
+                {COMPONENT_LIBRARY.filter(c =>
+                  c.name.toLowerCase().includes(componentSearchQuery.toLowerCase()) ||
+                  c.type.toLowerCase().includes(componentSearchQuery.toLowerCase())
+                ).length === 0 && (
+                  <div className="text-xs text-gray-400 px-2 py-1">No components found</div>
+                )}
+              </div>
+            </div>
+          </div>
+      )}
 
-                      {/* Advanced Components */}
-                      <div>
-                        <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3 px-1">Advanced Components</h4>
-                        <div className="grid grid-cols-1 gap-2">
-                          {componentLibrary.slice(6, 12).map((component) => (
-                            <button
-                              key={component.type}
-                              onClick={() => addComponentToCanvas(component.type)}
-                              draggable
-                              onDragStart={(e) => handleLibraryDragStart(e, component.type)}
-                              onDragEnd={handleLibraryDragEnd}
-                              className="group relative bg-white border border-gray-200 rounded-lg p-2 hover:border-purple-300 hover:shadow-md hover:shadow-purple-100 transition-all duration-200 cursor-grab active:cursor-grabbing"
-                            >
-                              {/* Component Preview */}
-                              <div className="w-full h-12 mb-2 rounded border border-gray-100 overflow-hidden bg-gradient-to-br from-gray-50 to-white shadow-sm">
-                                {renderComponentPreview(component.type)}
-                              </div>
-                              
-                              {/* Component Info */}
-                              <div className="flex items-center space-x-2">
-                                <div className="w-6 h-6 bg-gray-100 rounded-md flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-                                  <component.icon className="h-3 w-3 text-gray-600 group-hover:text-purple-600" />
-                                </div>
-                                <span className="text-sm font-medium text-gray-700 group-hover:text-purple-700">{component.name}</span>
-                              </div>
-                              
-                              {/* Hover Effect */}
-                              <div className="absolute inset-0 bg-purple-500 bg-opacity-0 group-hover:bg-opacity-5 rounded-xl transition-all duration-200 pointer-events-none" />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+      {/* Main Canvas */}
+      <div
+        className={`flex-1 relative overflow-hidden ${leftSidebarVisible ? '' : 'w-full'}`}
+        ref={containerRef}
+        onPaste={async (e) => {
+          // Paste image from clipboard like Figma
+          if (!activeScreen) return
+          const items = e.clipboardData?.items
+          if (!items || items.length === 0) return
+          let imageFile: File | null = null
+          for (const item of items as any) {
+            if (item.kind === 'file') {
+              const file = item.getAsFile()
+              if (file && file.type.startsWith('image/')) { imageFile = file; break }
+            }
+          }
+          if (!imageFile) return
+          e.preventDefault()
+          try {
+            const reader = new FileReader()
+            reader.onload = () => {
+              const dataUrl = reader.result as string
+              const screenId = activeScreen
+              const targetScreen = screens.find(s => s.id === screenId)
+              if (!targetScreen) return
+              const activeLayer = targetScreen.layers.find(l => l.id === targetScreen.activeLayer)
+              const nextZ = activeLayer ? Math.max(0, ...activeLayer.components.map(c => c.zIndex || 0)) + 1 : 1
+              const id = `image-${Date.now()}-${pasteImageCounterRef.current++}`
+              const newComponent: Component = {
+                id,
+                type: 'image',
+                name: 'Pasted Image',
+                props: { src: dataUrl, alt: 'Pasted Image', objectFit: 'cover' },
+                position: { x: 24, y: 24 },
+                size: { width: 240, height: 160 },
+                backgroundColor: '#f9fafb',
+                zIndex: nextZ
+              }
+              const updatedLayers = targetScreen.layers.map(layer =>
+                layer.id === targetScreen.activeLayer
+                  ? { ...layer, components: [...layer.components, newComponent] }
+                  : layer
+              )
+              updateScreen(targetScreen.id, { layers: updatedLayers })
+              addComponent(newComponent)
+              setSelectedComponentId(newComponent.id)
+              setRightSidebarVisible(true)
+            }
+            reader.readAsDataURL(imageFile)
+          } catch {}
+        }}
+      >
+        {/* Bottom Toolbar - Grouped dropdowns (always bottom-center of viewport) */}
+        <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-[70]">
+          <div className="flex items-center bg-white/95 backdrop-blur border border-gray-200 rounded-lg shadow-2xl px-3 py-2 space-x-2">
+            {/* Cursor group */}
+            <div className="relative">
+              <button
+                onClick={() => { setShowCursorMenu((v) => !v); setShowShapesMenu(false); setShowMediaMenu(false); setShowCommentsMenu(false); setShowFrameMenu(false) }}
+                className={`h-8 px-2 inline-flex items-center justify-center rounded-md hover:bg-gray-100 ${['select','move','hand','scale'].includes(activeTool) ? 'bg-gray-100 ring-1 ring-gray-300' : ''}`}
+                title="Cursor tools"
+              >
+                {activeTool === 'hand' ? <Hand className="w-4 h-4" /> : activeTool === 'scale' ? <ZoomIn className="w-4 h-4" /> : <Move className="w-4 h-4" />}
+                <span className="ml-1 px-1 rounded bg-gray-100 text-[10px] leading-none text-gray-600">V</span>
+                <ChevronDown className="w-3 h-3 ml-1 text-gray-500" />
+              </button>
+              {showCursorMenu && (
+                <div className="absolute bottom-11 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-1 w-32">
+                  <button onClick={() => { setActiveTool('select'); setShowCursorMenu(false) }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='select'?'bg-gray-100':''}`}>
+                    <Move className="w-4 h-4" /><span className="text-xs">Move/Select</span>
+                  </button>
+                  <button onClick={() => { setActiveTool('hand'); setShowCursorMenu(false) }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='hand'?'bg-gray-100':''}`}>
+                    <Hand className="w-4 h-4" /><span className="text-xs">Hand</span>
+                  </button>
+                  <button onClick={() => { setActiveTool('scale'); setShowCursorMenu(false) }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='scale'?'bg-gray-100':''}`}>
+                    <ZoomIn className="w-4 h-4" /><span className="text-xs">Scale</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
-                      {/* Interactive Elements */}
-                      <div>
-                        <h4 className="text-xs font-semibold text-gray-700 uppercase tracking-wide mb-3 px-1">Interactive Elements</h4>
-                        <div className="grid grid-cols-1 gap-2">
-                          {componentLibrary.slice(12).map((component) => (
-                            <button
-                              key={component.type}
-                              onClick={() => addComponentToCanvas(component.type)}
-                              draggable
-                              onDragStart={(e) => handleLibraryDragStart(e, component.type)}
-                              onDragEnd={handleLibraryDragEnd}
-                              className="group relative bg-white border border-gray-200 rounded-lg p-2 hover:border-green-300 hover:shadow-md hover:shadow-green-100 transition-all duration-200 cursor-grab active:cursor-grabbing"
-                            >
-                              {/* Component Preview */}
-                              <div className="w-full h-12 mb-2 rounded border border-gray-100 overflow-hidden bg-gradient-to-br from-gray-50 to-white shadow-sm">
-                                {renderComponentPreview(component.type)}
-                              </div>
-                              
-                              {/* Component Info */}
-                              <div className="flex items-center space-x-2">
-                                <div className="w-6 h-6 bg-gray-100 rounded-md flex items-center justify-center group-hover:bg-green-100 transition-colors">
-                                  <component.icon className="h-3 w-3 text-gray-600 group-hover:text-green-600" />
-                                </div>
-                                <span className="text-sm font-medium text-gray-700 group-hover:text-green-700">{component.name}</span>
-                              </div>
-                              
-                              {/* Hover Effect */}
-                              <div className="absolute inset-0 bg-green-500 bg-opacity-0 group-hover:bg-opacity-5 rounded-xl transition-all duration-200 pointer-events-none" />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
+            {/* Frame menu (moved to 2nd position) */}
+            <div className="relative">
+              <button
+                onClick={() => { setActiveTool('frame'); setShowFrameMenu((v) => !v); setShowCursorMenu(false); setShowShapesMenu(false); setShowMediaMenu(false); setShowCommentsMenu(false) }}
+                className={`h-8 px-2 inline-flex items-center justify-center rounded-md hover:bg-gray-100 ${activeTool === 'frame' || showFrameMenu ? 'bg-gray-100 ring-1 ring-gray-300' : ''}`}
+                title="Frame"
+              >
+                {/* Custom frame icon: 2 vertical + 2 horizontal lines (grid-like) */}
+                <svg className="w-4 h-4 text-gray-700" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <line x1="5" y1="2" x2="5" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <line x1="11" y1="2" x2="11" y2="14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <line x1="2" y1="5" x2="14" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <line x1="2" y1="11" x2="14" y2="11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+                <span className="ml-1 px-1 rounded bg-gray-100 text-[10px] leading-none text-gray-600">F</span>
+                <ChevronDown className="w-3 h-3 ml-1 text-gray-500" />
+              </button>
+              {showFrameMenu && (
+                <div className="absolute bottom-11 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-2 w-56">
+                  <div className="text-[11px] font-semibold text-gray-500 mb-1 px-1">iOS</div>
+                  {[{ name: 'iPhone SE', w: 375, h: 667, type: 'mobile' as const }, { name: 'iPhone 14', w: 390, h: 844, type: 'mobile' as const }, { name: 'iPhone 14 Plus', w: 428, h: 926, type: 'mobile' as const }, { name: 'iPad', w: 768, h: 1024, type: 'tablet' as const }].map(p => (
+                    <button key={p.name} onClick={() => { handleAddScreen({ name: p.name, width: p.w, height: p.h, type: p.type, icon: Smartphone }); closeAllMenus() }} className="w-full flex items-center justify-between px-2 py-1 rounded hover:bg-gray-100">
+                      <span className="text-xs text-gray-800">{p.name}</span>
+                      <span className="text-[11px] text-gray-500">{p.w} × {p.h}</span>
+                    </button>
+                  ))}
+                  <div className="text-[11px] font-semibold text-gray-500 mt-2 mb-1 px-1">Android</div>
+                  {[{ name: 'Android Small', w: 360, h: 640 }, { name: 'Android Medium', w: 411, h: 891 }, { name: 'Android Large', w: 480, h: 960 }].map(p => (
+                    <button key={p.name} onClick={() => { handleAddScreen({ name: p.name, width: p.w, height: p.h, type: 'mobile' as const, icon: Smartphone }); closeAllMenus() }} className="w-full flex items-center justify-between px-2 py-1 rounded hover:bg-gray-100">
+                      <span className="text-xs text-gray-800">{p.name}</span>
+                      <span className="text-[11px] text-gray-500">{p.w} × {p.h}</span>
+                    </button>
+                  ))}
+                  <div className="text-[11px] font-semibold text-gray-500 mt-2 mb-1 px-1">Desktop</div>
+                  {[{ name: 'Desktop 1440×900', w: 1440, h: 900 }, { name: 'Desktop 1920×1080', w: 1920, h: 1080 }].map(p => (
+                    <button key={p.name} onClick={() => { handleAddScreen({ name: p.name, width: p.w, height: p.h, type: 'desktop' as const, icon: Monitor }); closeAllMenus() }} className="w-full flex items-center justify-between px-2 py-1 rounded hover:bg-gray-100">
+                      <span className="text-xs text-gray-800">{p.name}</span>
+                      <span className="text-[11px] text-gray-500">{p.w} × {p.h}</span>
+                    </button>
+                  ))}
+                  <div className="text-[11px] text-gray-500 mt-2 px-1">Or drag on canvas with Frame tool to draw a custom frame.</div>
+                </div>
+              )}
+            </div>
+
+            {/* Shapes group */}
+            <div className="relative">
+              <button
+                onClick={() => { setShowShapesMenu((v) => !v); setShowCursorMenu(false); setShowMediaMenu(false); setShowCommentsMenu(false); setShowFrameMenu(false) }}
+                className={`h-8 px-2 inline-flex items-center justify-center rounded-md hover:bg-gray-100 ${['rectangle','ellipse','line','arrow','polygon','star'].includes(activeTool) ? 'bg-gray-100 ring-1 ring-gray-300' : ''}`}
+                title="Shapes"
+              >
+                {activeTool === 'ellipse' ? <Circle className="w-4 h-4" /> : activeTool === 'line' ? <Minus className="w-4 h-4" /> : activeTool === 'arrow' ? <ArrowRight className="w-4 h-4" /> : activeTool === 'polygon' ? <Pentagon className="w-4 h-4" /> : activeTool === 'star' ? <StarIcon className="w-4 h-4" /> : <Square className="w-4 h-4" />}
+                <ChevronDown className="w-3 h-3 ml-1 text-gray-500" />
+              </button>
+              {showShapesMenu && (
+                <div className="absolute bottom-11 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-1 w-36">
+                  <button onClick={() => { setActiveTool('rectangle'); setShowShapesMenu(false) }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='rectangle'?'bg-gray-100':''}`}>
+                    <Square className="w-4 h-4" /><span className="text-xs">Rectangle</span>
+                  </button>
+                  <button onClick={() => { setActiveTool('ellipse'); setShowShapesMenu(false) }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='ellipse'?'bg-gray-100':''}`}>
+                    <Circle className="w-4 h-4" /><span className="text-xs">Ellipse</span>
+                  </button>
+                  <button onClick={() => { setActiveTool('line'); setShowShapesMenu(false) }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='line'?'bg-gray-100':''}`}>
+                    <Minus className="w-4 h-4" /><span className="text-xs">Line</span>
+                  </button>
+                  <button onClick={() => { setActiveTool('arrow'); setShowShapesMenu(false) }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='arrow'?'bg-gray-100':''}`}>
+                    <ArrowRight className="w-4 h-4" /><span className="text-xs">Arrow</span>
+                  </button>
+                  <button onClick={() => { setActiveTool('polygon'); setShowShapesMenu(false) }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='polygon'?'bg-gray-100':''}`}>
+                    <Pentagon className="w-4 h-4" /><span className="text-xs">Polygon</span>
+                  </button>
+                  <button onClick={() => { setActiveTool('star'); setShowShapesMenu(false) }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='star'?'bg-gray-100':''}`}>
+                    <StarIcon className="w-4 h-4" /><span className="text-xs">Star</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Text/Image group (Frame separated) */}
+            <div className="relative">
+              <button
+                onClick={() => { setShowMediaMenu((v) => !v); setShowCursorMenu(false); setShowShapesMenu(false); setShowCommentsMenu(false); setShowFrameMenu(false) }}
+                className={`h-8 px-2 inline-flex items-center justify-center rounded-md hover:bg-gray-100 ${['text','image'].includes(activeTool) ? 'bg-gray-100 ring-1 ring-gray-300' : ''}`}
+                title="Media"
+              >
+                {activeTool === 'image' ? <Image className="w-4 h-4" /> : <Type className="w-4 h-4" />}
+                <ChevronDown className="w-3 h-3 ml-1 text-gray-500" />
+              </button>
+              {showMediaMenu && (
+                <div className="absolute bottom-11 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-1 w-28">
+                  <button onClick={() => { setActiveTool('text'); closeAllMenus() }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='text'?'bg-gray-100':''}`}>
+                    <Type className="w-4 h-4" /><span className="text-xs">Text</span>
+                  </button>
+                  <button onClick={() => { setActiveTool('image'); closeAllMenus() }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='image'?'bg-gray-100':''}`}>
+                    <Image className="w-4 h-4" /><span className="text-xs">Image</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            
+
+            {/* Comments group */}
+            <div className="relative">
+              <button
+                onClick={() => { setShowCommentsMenu((v) => !v); setShowCursorMenu(false); setShowShapesMenu(false); setShowMediaMenu(false); setShowFrameMenu(false) }}
+                className={`h-8 px-2 inline-flex items-center justify-center rounded-md hover:bg-gray-100 ${['comment','annotation','measurement'].includes(activeTool) ? 'bg-gray-100 ring-1 ring-gray-300' : ''}`}
+                title="Comments & Measure"
+              >
+                {activeTool === 'annotation' ? <StickyNote className="w-4 h-4" /> : activeTool === 'measurement' ? <Ruler className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
+                <ChevronDown className="w-3 h-3 ml-1 text-gray-500" />
+              </button>
+              {showCommentsMenu && (
+                <div className="absolute bottom-11 left-0 bg-white border border-gray-200 rounded-lg shadow-lg p-1 w-36">
+                  <button onClick={() => { setActiveTool('comment'); setShowCommentsMenu(false) }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='comment'?'bg-gray-100':''}`}>
+                    <MessageSquare className="w-4 h-4" /><span className="text-xs">Comment</span>
+                  </button>
+                  <button onClick={() => { setActiveTool('annotation'); setShowCommentsMenu(false) }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='annotation'?'bg-gray-100':''}`}>
+                    <StickyNote className="w-4 h-4" /><span className="text-xs">Annotation</span>
+                  </button>
+                  <button onClick={() => { setActiveTool('measurement'); setShowCommentsMenu(false) }} className={`w-full flex items-center space-x-2 px-2 py-1 rounded hover:bg-gray-100 ${activeTool==='measurement'?'bg-gray-100':''}`}>
+                    <Ruler className="w-4 h-4" /><span className="text-xs">Measurement</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Fullscreen toggle and properties */}
+            <div className="w-px h-6 bg-gray-200" />
+            <button
+              onClick={() => {
+                if (!isFullScreen) {
+                  prevLeftSidebarRef.current = leftSidebarVisible
+                  prevRightSidebarRef.current = rightSidebarVisible
+                  setLeftSidebarVisible(false)
+                  setRightSidebarVisible(false)
+                  setIsFullScreen(true)
+                } else {
+                  setLeftSidebarVisible(prevLeftSidebarRef.current)
+                  setRightSidebarVisible(prevRightSidebarRef.current)
+                  setIsFullScreen(false)
+                }
+              }}
+              className="h-9 px-3 flex items-center justify-center rounded-full hover:bg-gray-100 text-xs text-gray-700"
+              title={isFullScreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}
+            >
+              {isFullScreen ? 'Exit Full' : 'Full Screen'}
+            </button>
+
+            {/* Screen count indicator */}
+            <div className="h-9 px-3 flex items-center justify-center rounded-full text-xs text-gray-700">
+              <span className="relative inline-flex items-center">
+                <span className="relative inline-flex items-center justify-center mr-2">
+                  {/* Soft glow ring */}
+                  <span className="absolute inline-flex h-3 w-3 rounded-full bg-green-400 opacity-60 animate-ping"></span>
+                  {/* Core dot (smaller) */}
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-green-500 shadow-[0_0_6px_1px_rgba(34,197,94,0.7)]"></span>
+                </span>
+                <span>{screens.length} screen{screens.length !== 1 ? 's' : ''}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Left Sidebar Toggle Button (when sidebar is closed) */}
+        {!leftSidebarVisible && (
+          <div className="absolute top-4 left-4 z-40">
+            <button
+              onClick={() => setLeftSidebarVisible(true)}
+              className="flex items-center space-x-2 px-4 py-2 bg-white text-gray-700 rounded-lg shadow-lg hover:bg-gray-50 transition-colors border border-gray-200"
+              title="Show Tools"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+              <span className="text-sm font-medium">Design Tools</span>
+            </button>
+            </div>
+        )}
+
+        {/* Zoom Controls - repositioned to avoid sidebar overlaps */}
+        <div className={`absolute z-40 flex items-center space-x-2 ${leftSidebarVisible ? 'top-4 left-4' : 'top-16 left-4'}`}>
+          <button
+            onClick={zoomOut}
+            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
+            title="Zoom Out"
+          >
+            −
+          </button>
+          <div className="bg-white border border-gray-300 rounded shadow-lg px-3 py-1 text-sm text-gray-600">
+            {Math.round(zoom * 100)}%
+          </div>
+          <button
+            onClick={zoomIn}
+            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50"
+            title="Zoom In"
+          >
+            +
+          </button>
+          <button
+            onClick={resetView}
+            className="w-8 h-8 bg-white border border-gray-300 rounded shadow-lg flex items-center justify-center hover:bg-gray-50 text-xs"
+            title="Reset View"
+          >
+            ⌂
+          </button>
+          {/* Grid snapping controls */}
+          <div className="ml-2 bg-white border border-gray-300 rounded shadow-lg px-2 py-1 flex items-center space-x-2">
+            <label className="text-xs text-gray-600 flex items-center space-x-1">
+              <input type="checkbox" checked={snapToGrid} onChange={(e) => setSnapToGrid(e.target.checked)} />
+              <span>Snap</span>
+            </label>
+            <select
+              value={gridSize}
+              onChange={(e) => setGridSize(Number(e.target.value))}
+              className="text-xs border border-gray-200 rounded px-1 py-0.5 text-gray-700"
+              title="Grid size"
+            >
+              <option value={1}>1px</option>
+              <option value={2}>2px</option>
+              <option value={4}>4px</option>
+              <option value={8}>8px</option>
+              <option value={10}>10px</option>
+              <option value={20}>20px</option>
+            </select>
+          </div>
+            </div>
+
+                {/* Saving indicator */}
+        {isSaving && (
+          <div className="absolute top-16 left-4 bg-blue-100 border border-blue-300 rounded-lg px-4 py-2 text-blue-800 text-sm z-50">
+            Saving design...
+          </div>
+        )}
+
+                {/* Drag feedback */}
+        {isDraggingComponent && (
+          <div className="absolute top-16 left-4 bg-green-100 border border-green-300 rounded-lg px-4 py-2 text-green-800 text-sm z-50">
+            Drop component on any screen
+            </div>
+        )}
+
+        {/* Screen dragging feedback */}
+        {isDraggingScreen && (
+          <div className="absolute top-16 left-4 bg-purple-100 border border-purple-300 rounded-lg px-4 py-2 text-purple-800 text-sm z-50">
+            Dragging screen: {screens.find(s => s.id === draggedScreenId)?.name}
+          </div>
+        )}
+
+        {/* Canvas info removed per request */}
+
+        <div
+          ref={canvasRef}
+          className={`w-full h-full relative ${
+            isPanning ? 'cursor-grabbing' : isDraggingComponent ? 'cursor-copy' : activeTool === 'hand' ? 'cursor-grab' : 'cursor-default'
+          }`}
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, rgba(0,0,0,0.06) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(0,0,0,0.06) 1px, transparent 1px),
+              linear-gradient(to right, rgba(0,0,0,0.08) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(0,0,0,0.08) 1px, transparent 1px)
+            `,
+            backgroundSize: `${gridSize * zoom}px ${gridSize * zoom}px, ${gridSize * zoom}px ${gridSize * zoom}px, ${gridSize * 10 * zoom}px ${gridSize * 10 * zoom}px, ${gridSize * 10 * zoom}px ${gridSize * 10 * zoom}px`,
+            backgroundPosition: `${pan.x}px ${pan.y}px, ${pan.x}px ${pan.y}px, ${pan.x}px ${pan.y}px, ${pan.x}px ${pan.y}px`
+          }}
+          onDragOver={handleCanvasDragOver}
+          onDrop={handleCanvasDrop}
+          onClick={(e) => {
+            const rect = canvasRef.current?.getBoundingClientRect()
+            if (activeTool === 'scale' && rect) {
+              const canvasX = (e.clientX - rect.left - pan.x) / zoom
+              const canvasY = (e.clientY - rect.top - pan.y) / zoom
+              const factor = e.altKey ? 0.9 : 1.1
+              const newZoom = Math.min(Math.max(zoom * factor, 0.1), 3)
+              const newPanX = pan.x + canvasX * (zoom - newZoom)
+              const newPanY = pan.y + canvasY * (zoom - newZoom)
+              setZoom(newZoom)
+              setPan({ x: newPanX, y: newPanY })
+              return
+            }
+            if (activeTool === 'hand') {
+              // instruct users: use spacebar drag or middle mouse; keep default deselect behavior
+            }
+            if (e.target === e.currentTarget) {
+              setSelectedComponentId(null)
+              setRightSidebarVisible(false)
+            }
+          }}
+        >
+          {/* Content wrapper that pans/zooms inside the fixed canvas */}
+          <div
+            className="absolute top-0 left-0"
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transformOrigin: '0 0',
+              width: '100%',
+              height: '100%'
+            }}
+          >
+          {/* Canvas content - Render all screens */}
+          {screens.length === 0 ? (
+            /* Empty state - No screens */
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center p-8 bg-white rounded-xl shadow-lg border-2 border-dashed border-gray-300 max-w-md">
+                <div className="w-16 h-16 mx-auto mb-4 text-gray-400">
+                  <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-7-2h2v2h-2v-2zm0-10h2v8h-2V7z"/>
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Welcome to Design Mode</h3>
+                <p className="text-gray-600 mb-4">Start creating your app by adding your first screen</p>
+                <button
+                  onClick={() => setShowScreenPresets(true)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Add Your First Screen
+                </button>
+              </div>
+            </div>
+          ) : (
+            screens.map((screen) => {
+            const screenPos = screenPositions[screen.id] || { x: 200, y: 100 }
+            const screenComponents = getComponentsByScreen(screen.id)
+            const isActive = activeScreen === screen.id
+            
+            return (
+              <div
+                key={screen.id}
+                className={`absolute bg-white border-2 shadow-lg transition-all ${
+                  isActive ? (highlightedScreenId === screen.id ? 'border-blue-500 ring-4 ring-blue-400' : 'border-blue-500 ring-2 ring-blue-200') : 'border-gray-300 hover:border-gray-400'
+                } ${isDraggingScreen && draggedScreenId === screen.id ? 'cursor-grabbing' : 'cursor-grab'}`}
+                style={{
+                  width: screen.width,
+                  height: screen.height,
+                  left: screenPos.x,
+                  top: screenPos.y,
+                  zIndex: isActive ? 10 : 1
+                }}
+                onMouseDown={(e) => handleScreenMouseDown(e, screen.id)}
+                onDoubleClick={() => {
+                  setActiveScreen(screen.id)
+                  setHighlightedScreenId(screen.id)
+                  setTimeout(() => setHighlightedScreenId(prev => (prev === screen.id ? null : prev)), 800)
+                }}
+                onDragOver={handleCanvasDragOver}
+                onDrop={handleCanvasDrop}
+              >
+                {/* Screen header */}
+                <div 
+                  className="screen-header absolute -top-8 left-0 right-0 h-6 flex items-center justify-between px-2 bg-white border border-gray-300 rounded-t text-xs font-medium text-gray-700 cursor-move"
+                  style={{ zIndex: 15 }}
+                >
+                  <span>{screen.name}</span>
+                  <span className="text-gray-500">{screen.width} × {screen.height}</span>
+                </div>
+                
+                {/* Screen content */}
+                <div
+                  className="absolute top-0 left-0 w-full h-full overflow-hidden"
+                  onMouseDown={(e) => {
+                    // If select tool and clicked on empty area inside the screen, deselect
+                    if (activeTool === 'select' && e.target === e.currentTarget) {
+                      setSelectedComponentId(null)
+                      setRightSidebarVisible(false)
+                      return
+                    }
+                    beginDrawOnScreen(e, screen.id)
+                  }}
+                  onClick={(e) => {
+                    // Fallback: deselect on click if background area
+                    if (e.target === e.currentTarget) {
+                      setSelectedComponentId(null)
+                      setRightSidebarVisible(false)
+                    }
+                  }}
+                >
+                  {/* Drag alignment guides */}
+                  {dragGuides.screenId === screen.id && (dragGuides.v.length > 0 || dragGuides.h.length > 0) && (
+                    <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 20 }}>
+                      {dragGuides.v.map((x) => (
+                        <div key={`v-${x}`} className="absolute bg-pink-500/70" style={{ left: x, top: 0, width: 1, height: '100%' }} />
+                      ))}
+                      {dragGuides.h.map((y) => (
+                        <div key={`h-${y}`} className="absolute bg-pink-500/70" style={{ top: y, left: 0, height: 1, width: '100%' }} />
+                      ))}
                     </div>
                   )}
-                </div>
-
-                {/* Pre-built Pages Section */}
-                <div>
-                  <div className="mb-4 cursor-pointer hover:bg-gray-50 p-2 rounded-lg transition-colors">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-base font-semibold text-gray-900 mb-1">Pre-built Pages</h3>
-                        <p className="text-sm text-gray-500">Complete page templates with functionality</p>
-                      </div>
-                      <ChevronDown 
-                        className={`h-5 w-5 text-gray-400 transition-transform ${
-                          sidebarStates.screens ? 'rotate-0' : '-rotate-90'
-                        }`}
-                      />
-                    </div>
-                  </div>
-                  
-                  {sidebarStates.screens && (
-                    <div className="space-y-3">
-                      {/* Login Page */}
-                      <button 
-                        onClick={addLoginPage}
-                        className="w-full text-left bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50 transition-colors duration-200"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                              <span className="text-blue-600 text-sm">🔐</span>
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-900">Login Page</h4>
-                              <p className="text-xs text-gray-500">Authentication form with validation</p>
-                            </div>
-                          </div>
-                          <div className="text-xs text-blue-600 font-medium">Add</div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Form</span>
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Data Binding</span>
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">API</span>
-                        </div>
-                      </button>
-
-                      {/* Dashboard Page */}
-                      <button 
-                        onClick={addDashboardPage}
-                        className="w-full text-left bg-white border border-gray-200 rounded-lg p-4 hover:border-green-300 hover:bg-green-50 transition-colors duration-200"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                              <span className="text-green-600 text-sm">📊</span>
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-900">Dashboard</h4>
-                              <p className="text-xs text-gray-500">Analytics with charts and metrics</p>
-                            </div>
-                          </div>
-                          <div className="text-xs text-green-600 font-medium">Add</div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Charts</span>
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Data</span>
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Actions</span>
-                        </div>
-                      </button>
-
-                      {/* Profile Page */}
-                      <button 
-                        onClick={addProfilePage}
-                        className="w-full text-left bg-white border border-gray-200 rounded-lg p-4 hover:border-purple-300 hover:bg-purple-50 transition-colors duration-200"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                              <span className="text-purple-600 text-sm">👤</span>
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-900">Profile Page</h4>
-                              <p className="text-xs text-gray-500">User profile with settings</p>
-                            </div>
-                          </div>
-                          <div className="text-xs text-purple-600 font-medium">Add</div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Profile</span>
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Settings</span>
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Avatar</span>
-                        </div>
-                      </button>
-
-                      {/* E-commerce Page */}
-                      <button 
-                        onClick={addEcommercePage}
-                        className="w-full text-left bg-white border border-gray-200 rounded-lg p-4 hover:border-orange-300 hover:bg-orange-50 transition-colors duration-200"
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                              <span className="text-orange-600 text-sm">🛒</span>
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-900">E-commerce</h4>
-                              <p className="text-xs text-gray-500">Product catalog with cart</p>
-                            </div>
-                          </div>
-                          <div className="text-xs text-orange-600 font-medium">Add</div>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Products</span>
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Cart</span>
-                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">Checkout</span>
-                        </div>
-                      </button>
+                  {dragGuides.screenId === screen.id && dragGuides.badge && (
+                    <div className="absolute text-[10px] px-1.5 py-0.5 rounded bg-gray-900 text-white pointer-events-none" style={{ left: dragGuides.badge.x, top: dragGuides.badge.y, zIndex: 25 }}>
+                      {dragGuides.badge.text}
                     </div>
                   )}
+                  {screenComponents.map((component) => {
+                  const renderComponentContent = () => {
+                    const baseStyle: React.CSSProperties = {
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: component.backgroundColor,
+                      borderRadius: component.props?.borderRadius ? `${component.props.borderRadius}px` : undefined,
+                      border: component.props?.borderWidth ? 
+                        `${component.props.borderWidth}px ${component.props?.borderStyle || 'solid'} ${component.props?.borderColor || '#000'}` : 
+                        undefined,
+                      opacity: component.props?.opacity || 1,
+                      boxShadow: component.props?.shadowBlur ? 
+                        `${component.props?.shadowX || 0}px ${component.props?.shadowY || 0}px ${component.props.shadowBlur}px ${component.props?.shadowColor || '#000'}` : 
+                        undefined,
+                    }
+
+                    if (component.type === 'text') {
+                      return (
+                        <div
+                          style={{
+                            ...baseStyle,
+                            fontSize: component.props?.fontSize ? `${component.props.fontSize}px` : '16px',
+                            fontFamily: component.props?.fontFamily || 'Inter',
+                            fontWeight: component.props?.fontWeight || '500',
+                            fontStyle: component.props?.italic ? 'italic' : 'normal',
+                            textDecoration: component.props?.underline ? 'underline' : 'none',
+                            textTransform: component.props?.textTransform || 'none',
+                            color: component.props?.color || '#111827',
+                            textAlign: (component.props?.textAlign as any) || 'left',
+                            lineHeight: component.props?.lineHeight || 1.4,
+                            letterSpacing: component.props?.letterSpacing ? `${component.props.letterSpacing}px` : undefined,
+                            wordSpacing: component.props?.wordSpacing ? `${component.props.wordSpacing}px` : undefined,
+                            whiteSpace: component.props?.whiteSpace || 'normal',
+                            padding: '8px 10px',
+                            wordWrap: 'break-word',
+                            overflow: 'hidden'
+                          }}
+                        >
+                          {component.props?.text || 'Text'}
+                        </div>
+                      )
+                    }
+
+                    if (component.type === 'button') {
+                      return (
+                        <button
+                          style={{
+                            ...baseStyle,
+                            fontSize: '14px',
+                            fontFamily: 'Inter',
+                            fontWeight: 600,
+                            color: component.props?.color || '#ffffff',
+                          background: component.props?.gradient
+                              ? `linear-gradient(135deg, ${component.backgroundColor || '#ef4444'} 0%, ${component.props?.gradient} 100%)`
+                              : component.backgroundColor || '#ef4444',
+                            border: '0',
+                            cursor: 'pointer',
+                            borderRadius: component.props?.borderRadius ? `${component.props.borderRadius}px` : '10px',
+                            boxShadow: '0 8px 20px rgba(99,102,241,0.25)'
+                          }}
+                        >
+                          {component.props?.text || 'Button'}
+                        </button>
+                      )
+                    }
+
+                    if (component.type === 'input') {
+                      return (
+                        <input
+                          type={component.props?.type || 'text'}
+                          placeholder={component.props?.placeholder || 'Enter text'}
+                          style={{
+                            ...baseStyle,
+                            fontSize: '14px',
+                            fontFamily: 'Inter',
+                            padding: '10px 12px',
+                            border: '1px solid #e5e7eb',
+                            borderRadius: component.props?.borderRadius ? `${component.props.borderRadius}px` : '10px',
+                            backgroundColor: component.backgroundColor || '#ffffff',
+                            boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)'
+                          }}
+                        />
+                      )
+                    }
+
+                    if (component.type === 'image') {
+                      return (
+                        <div
+                          style={{
+                            ...baseStyle,
+                            backgroundColor: component.backgroundColor || '#f9fafb',
+                            borderRadius: component.props?.borderRadius ? `${component.props.borderRadius}px` : '12px',
+                            backgroundImage: component.props?.src ? `url(${component.props.src})` : undefined,
+                            backgroundSize: component.props?.objectFit === 'contain' ? 'contain' : 'cover',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundPosition: 'center',
+                            border: '1px solid #e5e7eb'
+                          }}
+                        >
+                          {!component.props?.src && (
+                            <div className="text-gray-500 text-sm">
+                              <Image size={20} className="mx-auto mb-1" />
+                              <span>Image</span>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+
+                    if (component.type === 'ellipse') {
+                      return (
+                        <div
+                          style={{
+                            ...baseStyle,
+                            borderRadius: '9999px',
+                            backgroundColor: component.backgroundColor || '#ffffff',
+                            border: component.props?.borderWidth
+                              ? `${component.props.borderWidth}px ${component.props?.borderStyle || 'solid'} ${component.props?.borderColor || '#000'}`
+                              : undefined
+                          }}
+                        />
+                      )
+                    }
+
+                    if (component.type === 'line' || component.type === 'arrow') {
+                      const horizontal = (component.size.width || 0) >= (component.size.height || 0)
+                      const stroke = component.props?.lineColor || '#111827'
+                      const thickness = Math.max(1, Number(component.props?.thickness) || 2)
+                      const w = Math.max(1, component.size.width)
+                      const h = Math.max(1, component.size.height)
+                      // Line endpoints (axis aligned)
+                      const x1 = 0
+                      const y1 = horizontal ? h / 2 : 0
+                      const x2 = horizontal ? w : 0
+                      const y2 = horizontal ? h / 2 : h
+                      // Arrowhead triangle near end
+                      let arrowPoints = ''
+                      if (component.type === 'arrow') {
+                        const head = 6 + thickness // arrow size scales with thickness
+                        if (horizontal) {
+                          arrowPoints = `${w - head},${y2 - head} ${w},${y2} ${w - head},${y2 + head}`
+                        } else {
+                          arrowPoints = `${x2 - head},${h - head} ${x2},${h} ${x2 + head},${h - head}`
+                        }
+                      }
+                      return (
+                        <svg width="100%" height="100%" style={{ display: 'block' }}>
+                          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth={thickness} />
+                          {component.type === 'arrow' && arrowPoints && (
+                            <polygon points={arrowPoints} fill={stroke} />
+                          )}
+                        </svg>
+                      )
+                    }
+                    if (component.type === 'polygon') {
+                      const sides = Math.max(3, Number(component.props?.sides) || 5)
+                      const w = Math.max(1, component.size.width)
+                      const h = Math.max(1, component.size.height)
+                      const cx = w / 2
+                      const cy = h / 2
+                      const r = Math.min(w, h) / 2
+                      const points = Array.from({ length: sides }, (_, i) => {
+                        const angle = (i / sides) * Math.PI * 2 - Math.PI / 2
+                        const x = cx + r * Math.cos(angle)
+                        const y = cy + r * Math.sin(angle)
+                        return `${x},${y}`
+                      }).join(' ')
+                      const stroke = component.props?.lineColor || '#111827'
+                      const thickness = Math.max(1, Number(component.props?.thickness) || 1)
+                      return (
+                        <svg width="100%" height="100%" style={{ display: 'block' }}>
+                          <polygon points={points} fill={component.backgroundColor || '#ffffff'} stroke={stroke} strokeWidth={thickness} />
+                        </svg>
+                      )
+                    }
+                    if (component.type === 'star') {
+                      const pointsNum = Math.max(3, Number(component.props?.points) || 5)
+                      const innerRatio = Math.max(0.1, Math.min(0.9, Number(component.props?.innerRatio) || 0.5))
+                      const w = Math.max(1, component.size.width)
+                      const h = Math.max(1, component.size.height)
+                      const cx = w / 2
+                      const cy = h / 2
+                      const outer = Math.min(w, h) / 2
+                      const inner = outer * innerRatio
+                      const total = pointsNum * 2
+                      const points = Array.from({ length: total }, (_, i) => {
+                        const r = (i % 2 === 0) ? outer : inner
+                        const angle = (i / total) * Math.PI * 2 - Math.PI / 2
+                        const x = cx + r * Math.cos(angle)
+                        const y = cy + r * Math.sin(angle)
+                        return `${x},${y}`
+                      }).join(' ')
+                      const stroke = component.props?.lineColor || '#111827'
+                      const thickness = Math.max(1, Number(component.props?.thickness) || 1)
+                      return (
+                        <svg width="100%" height="100%" style={{ display: 'block' }}>
+                          <polygon points={points} fill={component.backgroundColor || '#ffffff'} stroke={stroke} strokeWidth={thickness} />
+                        </svg>
+                      )
+                    }
+                    if (component.type === 'measurement') {
+                      const horizontal = (component.size.width || 0) >= (component.size.height || 0)
+                      const stroke = component.props?.lineColor || '#111827'
+                      const thickness = Math.max(1, Number(component.props?.thickness) || 2)
+                      const w = Math.max(1, component.size.width)
+                      const h = Math.max(1, component.size.height)
+                      const x1 = 0
+                      const y1 = horizontal ? h / 2 : 0
+                      const x2 = horizontal ? w : 0
+                      const y2 = horizontal ? h / 2 : h
+                      const label = `${Math.round(horizontal ? w : h)} px`
+                      return (
+                        <svg width="100%" height="100%" style={{ display: 'block' }}>
+                          {horizontal ? (
+                            <>
+                              <line x1={0} y1={0} x2={0} y2={h} stroke={stroke} strokeWidth={1} />
+                              <line x1={w} y1={0} x2={w} y2={h} stroke={stroke} strokeWidth={1} />
+                            </>
+                          ) : (
+                            <>
+                              <line x1={0} y1={0} x2={w} y2={0} stroke={stroke} strokeWidth={1} />
+                              <line x1={0} y1={h} x2={w} y2={h} stroke={stroke} strokeWidth={1} />
+                            </>
+                          )}
+                          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth={thickness} />
+                          <text x={w / 2} y={h / 2} fill={stroke} textAnchor="middle" dominantBaseline="middle" fontSize="10">{label}</text>
+                        </svg>
+                      )
+                    }
+                    if (component.type === 'comment') {
+                      return (
+                        <div style={{
+                          ...baseStyle,
+                          background: '#FFF9C4',
+                          color: '#111827',
+                          border: '1px solid #FDE68A',
+                          borderRadius: '8px',
+                          alignItems: 'flex-start',
+                          padding: '8px 10px'
+                        }}>
+                          {component.props?.text || 'Comment'}
+                        </div>
+                      )
+                    }
+                    if (component.type === 'annotation') {
+                      return (
+                        <div style={{
+                          ...baseStyle,
+                          background: component.props?.color || 'rgba(255, 214, 10, 0.25)',
+                          border: `${component.props?.borderWidth || 2}px solid ${component.props?.borderColor || '#f59e0b'}`,
+                          borderRadius: '6px'
+                        }} />
+                      )
+                    }
+
+                    // Default container/card
+                    return (
+                      <div
+                        style={{
+                          ...baseStyle,
+                          background: component.backgroundColor || '#ffffff',
+                          borderRadius: component.props?.borderRadius ? `${component.props.borderRadius}px` : '12px',
+                          border: '1px solid #e5e7eb',
+                          boxShadow: component.props?.shadowBlur
+                            ? baseStyle.boxShadow
+                            : '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)'
+                        }}
+                        className="text-sm text-gray-700"
+                      >
+                        {component.name}
+                      </div>
+                    )
+                  }
+
+                  const renderNestedChildren = (children?: Component[]) => {
+                    if (!children || children.length === 0) return null
+                    return children.map(child => (
+                      <div
+                        key={child.id}
+                        id={`comp-${child.id}`}
+                        data-component-id={child.id}
+                        className={`absolute cursor-pointer ${draggingComponentId === child.id ? 'grabbing' : 'grab'}`}
+                        style={{
+                          left: child.position.x,
+                          top: child.position.y,
+                          width: child.size.width,
+                          height: child.size.height,
+                          zIndex: child.zIndex,
+                        }}
+                        onMouseDown={(e) => handleComponentMouseDown(e, child, screen.id)}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedComponentId(child.id)
+                          setRightSidebarVisible(true)
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => handleNestedDrop(e, screen.id, component.id)}
+                      >
+                        {renderChildContent(child)}
+                        {/* Recursive children */}
+                        {renderNestedChildren(child.children)}
+                      </div>
+                    ))
+                  }
+
+                  const renderChildContent = (child: Component) => {
+                    // Reuse the same rendering rules as top-level components
+                    // by temporarily assigning to `component` and invoking existing block
+                    // We inline minimal duplication for safety
+                    const baseStyle: React.CSSProperties = {
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: child.backgroundColor,
+                      borderRadius: child.props?.borderRadius ? `${child.props.borderRadius}px` : undefined,
+                      border: child.props?.borderWidth ? `${child.props.borderWidth}px ${child.props?.borderStyle || 'solid'} ${child.props?.borderColor || '#000'}` : undefined,
+                      opacity: child.props?.opacity || 1,
+                      boxShadow: child.props?.shadowBlur ? `${child.props?.shadowX || 0}px ${child.props?.shadowY || 0}px ${child.props.shadowBlur}px ${child.props?.shadowColor || '#000'}` : undefined,
+                    }
+                    if (child.type === 'text') {
+                      return (
+                        <div style={{
+                          ...baseStyle,
+                          fontSize: child.props?.fontSize ? `${child.props.fontSize}px` : '16px',
+                          fontFamily: child.props?.fontFamily || 'Inter',
+                          fontWeight: child.props?.fontWeight || '500',
+                          fontStyle: child.props?.italic ? 'italic' : 'normal',
+                          textDecoration: child.props?.underline ? 'underline' : 'none',
+                          textTransform: child.props?.textTransform || 'none',
+                          color: child.props?.color || '#111827',
+                          textAlign: (child.props?.textAlign as any) || 'left',
+                          lineHeight: child.props?.lineHeight || 1.4,
+                          letterSpacing: child.props?.letterSpacing ? `${child.props.letterSpacing}px` : undefined,
+                          wordSpacing: child.props?.wordSpacing ? `${child.props.wordSpacing}px` : undefined,
+                          whiteSpace: child.props?.whiteSpace || 'normal',
+                          padding: '8px 10px',
+                          wordWrap: 'break-word',
+                          overflow: 'hidden'
+                        }}>{child.props?.text || 'Text'}</div>
+                      )
+                    }
+                    if (child.type === 'button') {
+                      return (
+                        <button style={{
+                          ...baseStyle,
+                          fontSize: '14px', fontFamily: 'Inter', fontWeight: 600,
+                          color: child.props?.color || '#ffffff',
+                          background: child.props?.gradient ? `linear-gradient(135deg, ${child.backgroundColor || '#ef4444'} 0%, ${child.props?.gradient} 100%)` : child.backgroundColor || '#ef4444',
+                          border: '0', cursor: 'pointer', borderRadius: child.props?.borderRadius ? `${child.props.borderRadius}px` : '10px',
+                          boxShadow: '0 8px 20px rgba(99,102,241,0.25)'
+                        }}>{child.props?.text || 'Button'}</button>
+                      )
+                    }
+                    if (child.type === 'input') {
+                      return (
+                        <input type={child.props?.type || 'text'} placeholder={child.props?.placeholder || 'Enter text'} style={{
+                          ...baseStyle,
+                          fontSize: '14px', fontFamily: 'Inter', padding: '10px 12px',
+                          border: '1px solid #e5e7eb', borderRadius: child.props?.borderRadius ? `${child.props.borderRadius}px` : '10px',
+                          backgroundColor: child.backgroundColor || '#ffffff', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)'
+                        }} />
+                      )
+                    }
+                    if (child.type === 'image') {
+                      return (
+                        <div style={{
+                          ...baseStyle,
+                          backgroundColor: child.backgroundColor || '#f9fafb',
+                          borderRadius: child.props?.borderRadius ? `${child.props.borderRadius}px` : '12px',
+                          backgroundImage: child.props?.src ? `url(${child.props.src})` : undefined,
+                          backgroundSize: child.props?.objectFit === 'contain' ? 'contain' : 'cover',
+                          backgroundRepeat: 'no-repeat', backgroundPosition: 'center', border: '1px solid #e5e7eb'
+                        }}>
+                          {!child.props?.src && <div className="text-gray-500 text-sm">Image</div>}
+                        </div>
+                      )
+                    }
+                     if (child.type === 'ellipse') {
+                      return (
+                        <div style={{
+                          ...baseStyle, borderRadius: '9999px', backgroundColor: child.backgroundColor || '#ffffff',
+                          border: child.props?.borderWidth ? `${child.props.borderWidth}px ${child.props?.borderStyle || 'solid'} ${child.props?.borderColor || '#000'}` : undefined
+                        }} />
+                      )
+                    }
+                     if (child.type === 'polygon') {
+                       const sides = Math.max(3, Number(child.props?.sides) || 5)
+                       const w = Math.max(1, child.size.width)
+                       const h = Math.max(1, child.size.height)
+                       const cx = w / 2
+                       const cy = h / 2
+                       const r = Math.min(w, h) / 2
+                       const points = Array.from({ length: sides }, (_, i) => {
+                         const angle = (i / sides) * Math.PI * 2 - Math.PI / 2
+                         const x = cx + r * Math.cos(angle)
+                         const y = cy + r * Math.sin(angle)
+                         return `${x},${y}`
+                       }).join(' ')
+                       const stroke = child.props?.lineColor || '#111827'
+                       const thickness = Math.max(1, Number(child.props?.thickness) || 1)
+                       return (
+                         <svg width="100%" height="100%" style={{ display: 'block' }}>
+                           <polygon points={points} fill={child.backgroundColor || '#ffffff'} stroke={stroke} strokeWidth={thickness} />
+                         </svg>
+                       )
+                     }
+                     if (child.type === 'star') {
+                       const pointsNum = Math.max(3, Number(child.props?.points) || 5)
+                       const innerRatio = Math.max(0.1, Math.min(0.9, Number(child.props?.innerRatio) || 0.5))
+                       const w = Math.max(1, child.size.width)
+                       const h = Math.max(1, child.size.height)
+                       const cx = w / 2
+                       const cy = h / 2
+                       const outer = Math.min(w, h) / 2
+                       const inner = outer * innerRatio
+                       const total = pointsNum * 2
+                       const points = Array.from({ length: total }, (_, i) => {
+                         const r = (i % 2 === 0) ? outer : inner
+                         const angle = (i / total) * Math.PI * 2 - Math.PI / 2
+                         const x = cx + r * Math.cos(angle)
+                         const y = cy + r * Math.sin(angle)
+                         return `${x},${y}`
+                       }).join(' ')
+                       const stroke = child.props?.lineColor || '#111827'
+                       const thickness = Math.max(1, Number(child.props?.thickness) || 1)
+                       return (
+                         <svg width="100%" height="100%" style={{ display: 'block' }}>
+                           <polygon points={points} fill={child.backgroundColor || '#ffffff'} stroke={stroke} strokeWidth={thickness} />
+                         </svg>
+                       )
+                     }
+                     if (child.type === 'measurement') {
+                       const horizontal = (child.size.width || 0) >= (child.size.height || 0)
+                       const stroke = child.props?.lineColor || '#111827'
+                       const thickness = Math.max(1, Number(child.props?.thickness) || 2)
+                       const w = Math.max(1, child.size.width)
+                       const h = Math.max(1, child.size.height)
+                       const x1 = 0
+                       const y1 = horizontal ? h / 2 : 0
+                       const x2 = horizontal ? w : 0
+                       const y2 = horizontal ? h / 2 : h
+                       const label = `${Math.round(horizontal ? w : h)} px`
+                       return (
+                         <svg width="100%" height="100%" style={{ display: 'block' }}>
+                           {horizontal ? (
+                             <>
+                               <line x1={0} y1={0} x2={0} y2={h} stroke={stroke} strokeWidth={1} />
+                               <line x1={w} y1={0} x2={w} y2={h} stroke={stroke} strokeWidth={1} />
+                             </>
+                           ) : (
+                             <>
+                               <line x1={0} y1={0} x2={w} y2={0} stroke={stroke} strokeWidth={1} />
+                               <line x1={0} y1={h} x2={w} y2={h} stroke={stroke} strokeWidth={1} />
+                             </>
+                           )}
+                           <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth={thickness} />
+                           <text x={w / 2} y={h / 2} fill={stroke} textAnchor="middle" dominantBaseline="middle" fontSize="10">{label}</text>
+                         </svg>
+                       )
+                     }
+                     if (child.type === 'comment') {
+                       return (
+                         <div style={{
+                           ...baseStyle,
+                           background: '#FFF9C4', color: '#111827', border: '1px solid #FDE68A', borderRadius: '8px',
+                           alignItems: 'flex-start', padding: '8px 10px'
+                         }}>{child.props?.text || 'Comment'}</div>
+                       )
+                     }
+                     if (child.type === 'annotation') {
+                       return (
+                         <div style={{
+                           ...baseStyle,
+                           background: child.props?.color || 'rgba(255, 214, 10, 0.25)',
+                           border: `${child.props?.borderWidth || 2}px solid ${child.props?.borderColor || '#f59e0b'}`,
+                           borderRadius: '6px'
+                         }} />
+                       )
+                     }
+                    if (child.type === 'line' || child.type === 'arrow') {
+                      const horizontal = (child.size.width || 0) >= (child.size.height || 0)
+                      const stroke = child.props?.lineColor || '#111827'
+                      const thickness = Math.max(1, Number(child.props?.thickness) || 2)
+                      const w = Math.max(1, child.size.width)
+                      const h = Math.max(1, child.size.height)
+                      const x1 = 0
+                      const y1 = horizontal ? h / 2 : 0
+                      const x2 = horizontal ? w : 0
+                      const y2 = horizontal ? h / 2 : h
+                      let arrowPoints = ''
+                      if (child.type === 'arrow') {
+                        const head = 6 + thickness
+                        if (horizontal) arrowPoints = `${w - head},${y2 - head} ${w},${y2} ${w - head},${y2 + head}`
+                      }
+                      return (
+                        <svg width="100%" height="100%" style={{ display: 'block' }}>
+                          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth={thickness} />
+                          {child.type === 'arrow' && arrowPoints && (<polygon points={arrowPoints} fill={stroke} />)}
+                        </svg>
+                      )
+                    }
+                    return (
+                      <div style={{
+                        ...baseStyle,
+                        background: child.backgroundColor || '#ffffff', borderRadius: child.props?.borderRadius ? `${child.props.borderRadius}px` : '12px',
+                        border: '1px solid #e5e7eb', boxShadow: child.props?.shadowBlur ? baseStyle.boxShadow as any : '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)'
+                      }} className="text-sm text-gray-700">{child.name}</div>
+                    )
+                  }
+
+                  return (
+                    <div
+                      key={component.id}
+                      id={`comp-${component.id}`}
+                      data-component-id={component.id}
+                      onClick={(e) => {
+    e.stopPropagation()
+                        setSelectedComponentId(component.id)
+                        setRightSidebarVisible(true)
+                      }}
+                      onDoubleClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedComponentId(component.id)
+                        setRightSidebarVisible(true)
+                      }}
+                      onMouseDown={(e) => handleComponentMouseDown(e, component, screen.id)}
+                      className={`absolute cursor-pointer transition-all component-hover ${
+                        selectedComponent?.id === component.id
+                          ? 'ring-2 ring-blue-500 ring-offset-2'
+                          : 'hover:ring-1 hover:ring-gray-300'
+                      }`}
+                      style={{
+                        left: component.position.x,
+                        top: component.position.y,
+                        width: component.size.width,
+                        height: component.size.height,
+                        zIndex: component.zIndex,
+                        cursor: draggingComponentId === component.id ? 'grabbing' : 'grab'
+                      }}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={(e) => handleNestedDrop(e, screen.id, component.id)}
+                    >
+                      {renderComponentContent()}
+                      {/* Render nested children inside this container */}
+                      {renderNestedChildren(component.children)}
+                      {/* Resize handles */}
+                      <div className="absolute inset-0 pointer-events-none" style={{ display: selectedComponent?.id === component.id ? 'block' : 'none' }}>
+                        {/* Corner handles only */}
+                        <button className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-white border border-gray-300 rounded cursor-nw-resize" style={{ pointerEvents: 'auto' }} onMouseDown={(e) => handleResizeMouseDown(e, component, screen.id, 'nw')} aria-label="Resize nw" />
+                        <button className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-white border border-gray-300 rounded cursor-ne-resize" style={{ pointerEvents: 'auto' }} onMouseDown={(e) => handleResizeMouseDown(e, component, screen.id, 'ne')} aria-label="Resize ne" />
+                        <button className="absolute -bottom-1 -left-1 w-2.5 h-2.5 bg-white border border-gray-300 rounded cursor-sw-resize" style={{ pointerEvents: 'auto' }} onMouseDown={(e) => handleResizeMouseDown(e, component, screen.id, 'sw')} aria-label="Resize sw" />
+                        <button className="absolute -bottom-1 -right-1 w-2.5 h-2.5 bg-white border border-gray-300 rounded cursor-se-resize" style={{ pointerEvents: 'auto' }} onMouseDown={(e) => handleResizeMouseDown(e, component, screen.id, 'se')} aria-label="Resize se" />
+                        {/* Invisible edge hit areas for resize from any side */}
+                        <div
+                          className="absolute top-0 left-2 right-2 h-1 cursor-n-resize"
+                          style={{ pointerEvents: 'auto' }}
+                          onMouseDown={(e) => handleResizeMouseDown(e, component, screen.id, 'n')}
+                          aria-label="Resize n"
+                        />
+                        <div
+                          className="absolute bottom-0 left-2 right-2 h-1 cursor-s-resize"
+                          style={{ pointerEvents: 'auto' }}
+                          onMouseDown={(e) => handleResizeMouseDown(e, component, screen.id, 's')}
+                          aria-label="Resize s"
+                        />
+                        <div
+                          className="absolute left-0 top-2 bottom-2 w-1 cursor-w-resize"
+                          style={{ pointerEvents: 'auto' }}
+                          onMouseDown={(e) => handleResizeMouseDown(e, component, screen.id, 'w')}
+                          aria-label="Resize w"
+                        />
+                        <div
+                          className="absolute right-0 top-2 bottom-2 w-1 cursor-e-resize"
+                          style={{ pointerEvents: 'auto' }}
+                          onMouseDown={(e) => handleResizeMouseDown(e, component, screen.id, 'e')}
+                          aria-label="Resize e"
+                        />
+                      </div>
+                    </div>
+                                    )
+                  })}
                 </div>
               </div>
-            )}
+            )
+          }))}
+          </div>
+        </div>
           </div>
 
-          {/* Back to Dashboard Button - Bottom */}
-          <div className="p-4 border-t border-gray-200">
+      {/* Right Sidebar - Properties Panel */}
+      {rightSidebarVisible && selectedComponent && !isFullScreen && (
+        <div className="absolute top-0 right-0 h-full w-80 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 z-60 shadow-lg">
+          <div className="flex-1 overflow-y-auto pb-24">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold text-gray-900">Component Properties</h3>
+                <button
+                  onClick={() => {
+              setSelectedComponentId(null)
+                    setRightSidebarVisible(false)
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+            </div>
+              
+              <div className="space-y-4">
+                {/* Position section */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Position</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">X</label>
+                      <input
+                        type="number"
+                        value={selectedComponent.position.x}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          position: { ...selectedComponent.position, x: Number(e.target.value) }
+                        })}
+                        className="w-full px-2 py-1 text-sm border border-gray-200 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Y</label>
+                      <input
+                        type="number"
+                        value={selectedComponent.position.y}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          position: { ...selectedComponent.position, y: Number(e.target.value) }
+                        })}
+                        className="w-full px-2 py-1 text-sm border border-gray-200 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Width</label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={selectedComponent.size.width}
+                        onChange={(e) => {
+                          const parsed = Number(e.target.value)
+                          if (Number.isNaN(parsed)) return
+                          const width = Math.max(1, parsed)
+                          updateComponent(selectedComponent.id, { size: { ...selectedComponent.size, width } })
+                        }}
+                        className="w-full px-2 py-1 text-sm border border-gray-200 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Height</label>
+                      <input
+                        type="number"
+                        min={1}
+                        step={1}
+                        value={selectedComponent.size.height}
+                        onChange={(e) => {
+                          const parsed = Number(e.target.value)
+                          if (Number.isNaN(parsed)) return
+                          const height = Math.max(1, parsed)
+                          updateComponent(selectedComponent.id, { size: { ...selectedComponent.size, height } })
+                        }}
+                        className="w-full px-2 py-1 text-sm border border-gray-200 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Rotation</label>
+                      <input
+                        type="number"
+                        step={1}
+                        value={selectedComponent.rotation || 0}
+                        onChange={(e) => updateComponent(selectedComponent.id, { rotation: Number(e.target.value) })}
+                        className="w-full px-2 py-1 text-sm border border-gray-200 rounded"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Layout section */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Layout</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Flow</label>
+                      <select
+                        value={selectedComponent.props?.flow || 'none'}
+                        onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, flow: e.target.value } })}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                      >
+                        <option value="none">None</option>
+                        <option value="vertical">Vertical</option>
+                        <option value="horizontal">Horizontal</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Padding</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={selectedComponent.props?.padding || 0}
+                        onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, padding: Number(e.target.value) } })}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Appearance section */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Appearance</h4>
+                  
+                  {/* Background Color with Color Space and Alpha */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Background</label>
+                    {(() => {
+                      const current = selectedComponent.backgroundColor || '#ffffff'
+                      const space = getColorSpaceFromString(current)
+                      let srgbHex = '#ffffff'
+                      let alpha = 1
+                      let p3 = { r: 1, g: 1, b: 1 }
+                      if (space === 'srgb') {
+                        // parse hex or rgba
+                        const asRgba = parseRgba(current)
+                        if (asRgba) {
+                          srgbHex = rgbToHex(asRgba.r, asRgba.g, asRgba.b)
+                          alpha = asRgba.a
+                        } else {
+                          const h = parseHex(current)
+                          if (h) {
+                            srgbHex = rgbToHex(h.r, h.g, h.b)
+                            alpha = selectedComponent.props?.opacity ?? 1
+                          }
+                        }
+                      } else {
+                        const p = parseP3(current)
+                        if (p) { p3 = { r: p.r, g: p.g, b: p.b }; alpha = p.a }
+                      }
+                      return (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-3 gap-2 text-xs">
+                            <button
+                              className={`px-2 py-1 rounded border ${space==='srgb'?'border-blue-400 text-blue-600':'border-gray-200 text-gray-700'}`}
+                              onClick={() => {
+                                // convert from p3 to srgb approximately by scaling [0..1] to 0..255
+                                if (space === 'p3') {
+                                  const p = parseP3(current)
+                                  const r = Math.round((p?.r ?? 1) * 255)
+                                  const g = Math.round((p?.g ?? 1) * 255)
+                                  const b = Math.round((p?.b ?? 1) * 255)
+                                  const hex = rgbToHex(r, g, b)
+                                  updateComponent(selectedComponent.id, { backgroundColor: buildSrgbCss(hex, p?.a ?? 1) })
+                                }
+                              }}
+                            >sRGB</button>
+                            <button
+                              className={`px-2 py-1 rounded border ${space==='p3'?'border-blue-400 text-blue-600':'border-gray-200 text-gray-700'}`}
+                              onClick={() => {
+                                if (space === 'srgb') {
+                                  const h = parseHex(srgbHex)
+                                  if (h) {
+                                    updateComponent(selectedComponent.id, { backgroundColor: buildP3Css(h.r/255, h.g/255, h.b/255, alpha) })
+                                  }
+                                }
+                              }}
+                            >P3</button>
+                            <div className="flex items-center space-x-2">
+                              <span className="text-gray-500">A</span>
+                              <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={alpha}
+                                onChange={(e) => {
+                                  const a = Number(e.target.value)
+                                  if (space === 'srgb') {
+                                    updateComponent(selectedComponent.id, { backgroundColor: buildSrgbCss(srgbHex, a) })
+                                  } else {
+                                    updateComponent(selectedComponent.id, { backgroundColor: buildP3Css(p3.r, p3.g, p3.b, a) })
+                                  }
+                                }}
+                                className="w-full"
+                              />
+                            </div>
+                          </div>
+                          {space === 'srgb' ? (
+                            <div className="flex space-x-2">
+                              <input
+                                type="color"
+                                value={srgbHex}
+                                onChange={(e) => updateComponent(selectedComponent.id, { backgroundColor: buildSrgbCss(e.target.value, alpha) })}
+                                className="w-10 h-8 border border-gray-200 rounded cursor-pointer"
+                              />
+                              <input
+                                type="text"
+                                value={srgbHex}
+                                onChange={(e) => updateComponent(selectedComponent.id, { backgroundColor: buildSrgbCss(e.target.value, alpha) })}
+                                className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded font-mono"
+                                placeholder="#ffffff"
+                              />
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <div className="grid grid-cols-3 gap-2">
+                                {(['r','g','b'] as const).map((ch, idx) => (
+                                  <div key={ch} className="flex items-center space-x-1">
+                                    <span className="text-xs text-gray-500">{ch.toUpperCase()}</span>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={1}
+                                      step={0.01}
+                                      value={idx===0? p3.r : idx===1? p3.g : p3.b}
+                                      onChange={(e) => {
+                                        const v = Math.max(0, Math.min(1, Number(e.target.value)))
+                                        const next = { r: p3.r, g: p3.g, b: p3.b }
+                                        if (idx===0) next.r = v; else if (idx===1) next.g = v; else next.b = v
+                                        updateComponent(selectedComponent.id, { backgroundColor: buildP3Css(next.r, next.g, next.b, alpha) })
+                                      }}
+                                      className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                              {/* P3 color input box (mapped via sRGB picker) */}
+                              <div className="flex space-x-2 items-center">
+                                {(() => {
+                                  const hexFromP3 = rgbToHex(Math.round(p3.r*255), Math.round(p3.g*255), Math.round(p3.b*255))
+                                  return (
+                                    <>
+                                      <input
+                                        type="color"
+                                        value={hexFromP3}
+                                        onChange={(e) => {
+                                          const h = parseHex(e.target.value)
+                                          if (h) {
+                                            updateComponent(selectedComponent.id, { backgroundColor: buildP3Css(h.r/255, h.g/255, h.b/255, alpha) })
+                                          }
+                                        }}
+                                        className="w-10 h-8 border border-gray-200 rounded cursor-pointer"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={`color(display-p3 ${p3.r.toFixed(3)} ${p3.g.toFixed(3)} ${p3.b.toFixed(3)} / ${alpha.toFixed(2)})`}
+                                        onChange={(e) => {
+                                          const parsed = parseP3(e.target.value)
+                                          if (parsed) {
+                                            updateComponent(selectedComponent.id, { backgroundColor: buildP3Css(parsed.r, parsed.g, parsed.b, parsed.a) })
+                                          }
+                                        }}
+                                        className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded font-mono"
+                                      />
+                                    </>
+                                  )
+                                })()}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </div>
+
+                  {/* Stroke */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Stroke</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        value={selectedComponent.props?.borderWidth || 0}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          props: { ...selectedComponent.props, borderWidth: Number(e.target.value) }
+                        })}
+                        className="px-2 py-1 text-xs border border-gray-200 rounded"
+                        placeholder="Width"
+                      />
+                      <input
+                        type="color"
+                        value={selectedComponent.props?.borderColor || '#000000'}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          props: { ...selectedComponent.props, borderColor: e.target.value }
+                        })}
+                        className="w-full h-7 border border-gray-200 rounded cursor-pointer"
+                      />
+                    </div>
+                    <div className="mt-1">
+                      <select
+                        value={selectedComponent.props?.borderStyle || 'solid'}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          props: { ...selectedComponent.props, borderStyle: e.target.value }
+                        })}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                      >
+                        <option value="solid">Solid</option>
+                        <option value="dashed">Dashed</option>
+                        <option value="dotted">Dotted</option>
+                        <option value="none">None</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Corner Radius */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Corner Radius</label>
+                    <input
+                      type="number"
+                      value={selectedComponent.props?.borderRadius || 0}
+                      onChange={(e) => updateComponent(selectedComponent.id, { 
+                        props: { ...selectedComponent.props, borderRadius: Number(e.target.value) }
+                      })}
+                      className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                      placeholder="0"
+                    />
+                  </div>
+
+                  {/* Shadow */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Shadow</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        value={selectedComponent.props?.shadowBlur || 0}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          props: { ...selectedComponent.props, shadowBlur: Number(e.target.value) }
+                        })}
+                        className="px-2 py-1 text-xs border border-gray-200 rounded"
+                        placeholder="Blur"
+                      />
+                      <input
+                        type="color"
+                        value={selectedComponent.props?.shadowColor || '#000000'}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          props: { ...selectedComponent.props, shadowColor: e.target.value }
+                        })}
+                        className="w-full h-7 border border-gray-200 rounded cursor-pointer"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <input
+                        type="number"
+                        value={selectedComponent.props?.shadowX || 0}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          props: { ...selectedComponent.props, shadowX: Number(e.target.value) }
+                        })}
+                        className="px-2 py-1 text-xs border border-gray-200 rounded"
+                        placeholder="X offset"
+                      />
+                      <input
+                        type="number"
+                        value={selectedComponent.props?.shadowY || 0}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          props: { ...selectedComponent.props, shadowY: Number(e.target.value) }
+                        })}
+                        className="px-2 py-1 text-xs border border-gray-200 rounded"
+                        placeholder="Y offset"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Opacity */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Opacity</label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="range"
+                        min="0"
+                        max="1"
+                        step="0.01"
+                        value={selectedComponent.props?.opacity || 1}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          props: { ...selectedComponent.props, opacity: Number(e.target.value) }
+                        })}
+                        className="flex-1"
+                      />
+                      <span className="text-xs text-gray-500 w-8">
+                        {Math.round((selectedComponent.props?.opacity || 1) * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Typography Section - Only for text components */}
+                {selectedComponent.type === 'text' && (
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Typography</h4>
+                    
+                    {/* Text Content */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Text</label>
+                      <textarea
+                        value={selectedComponent.props?.text || ''}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          props: { ...selectedComponent.props, text: e.target.value }
+                        })}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded resize-none"
+                        rows={3}
+                        placeholder="Enter text..."
+                      />
+                    </div>
+
+                    {/* Font Family */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Font Family</label>
+                      <select
+                        value={selectedComponent.props?.fontFamily || 'Inter'}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          props: { ...selectedComponent.props, fontFamily: e.target.value }
+                        })}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                      >
+                        <option value="Inter">Inter</option>
+                        <option value="Helvetica">Helvetica</option>
+                        <option value="Arial">Arial</option>
+                        <option value="Times New Roman">Times New Roman</option>
+                        <option value="Georgia">Georgia</option>
+                        <option value="Courier New">Courier New</option>
+                        <option value="Roboto">Roboto</option>
+                        <option value="Open Sans">Open Sans</option>
+                      </select>
+                    </div>
+
+                    {/* Font Size & Weight */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Size</label>
+                        <input
+                          type="number"
+                          value={selectedComponent.props?.fontSize || 16}
+                          onChange={(e) => updateComponent(selectedComponent.id, { 
+                            props: { ...selectedComponent.props, fontSize: Number(e.target.value) }
+                          })}
+                          className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                          min="8"
+                          max="72"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Weight</label>
+                        <select
+                          value={selectedComponent.props?.fontWeight || 'normal'}
+                          onChange={(e) => updateComponent(selectedComponent.id, { 
+                            props: { ...selectedComponent.props, fontWeight: e.target.value }
+                          })}
+                          className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                        >
+                          <option value="100">Thin</option>
+                          <option value="200">Extra Light</option>
+                          <option value="300">Light</option>
+                          <option value="normal">Normal</option>
+                          <option value="500">Medium</option>
+                          <option value="600">Semi Bold</option>
+                          <option value="bold">Bold</option>
+                          <option value="800">Extra Bold</option>
+                          <option value="900">Black</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Text Color */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Text Color</label>
+                      <div className="flex space-x-2">
+                        <input
+                          type="color"
+                          value={selectedComponent.props?.color || '#000000'}
+                          onChange={(e) => updateComponent(selectedComponent.id, { 
+                            props: { ...selectedComponent.props, color: e.target.value }
+                          })}
+                          className="w-10 h-8 border border-gray-200 rounded cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={selectedComponent.props?.color || '#000000'}
+                          onChange={(e) => updateComponent(selectedComponent.id, { 
+                            props: { ...selectedComponent.props, color: e.target.value }
+                          })}
+                          className="flex-1 px-2 py-1 text-xs border border-gray-200 rounded font-mono"
+                          placeholder="#000000"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Text Alignment */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Text Align</label>
+                      <div className="flex space-x-1">
+                        {[
+                          { value: 'left', icon: AlignLeft },
+                          { value: 'center', icon: AlignCenter },
+                          { value: 'right', icon: AlignRight },
+                          { value: 'justify', icon: AlignJustify }
+                        ].map(({ value, icon: Icon }) => (
         <button
-              onClick={() => navigate('/user-dashboard')}
-              className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium rounded-lg flex items-center justify-center space-x-2 transition-colors"
-        >
-              <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
-              <span>Back to Dashboard</span>
+                            key={value}
+                            onClick={() => updateComponent(selectedComponent.id, { 
+                              props: { ...selectedComponent.props, textAlign: value }
+                            })}
+                            className={`p-2 border border-gray-200 rounded ${
+                              selectedComponent.props?.textAlign === value 
+                                ? 'bg-blue-100 border-blue-500' 
+                                : 'hover:bg-gray-50'
+                            }`}
+                          >
+                            <Icon size={12} />
         </button>
+                        ))}
+      </div>
+                    </div>
+
+                    {/* Line Height */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Line Height</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={selectedComponent.props?.lineHeight || 1.2}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          props: { ...selectedComponent.props, lineHeight: Number(e.target.value) }
+                        })}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                        min="0.5"
+                        max="3"
+                      />
+                    </div>
+
+                    {/* Letter Spacing */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Letter Spacing</label>
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={selectedComponent.props?.letterSpacing || 0}
+                        onChange={(e) => updateComponent(selectedComponent.id, { 
+                          props: { ...selectedComponent.props, letterSpacing: Number(e.target.value) }
+                        })}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                        min="-2"
+                        max="10"
+                      />
+        </div>
+
+                  {/* Word Spacing */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Word Spacing</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={selectedComponent.props?.wordSpacing || 0}
+                      onChange={(e) => updateComponent(selectedComponent.id, {
+                        props: { ...selectedComponent.props, wordSpacing: Number(e.target.value) }
+                      })}
+                      className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                      min="-10"
+                      max="50"
+                    />
+                  </div>
+
+                  {/* White Space */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">White Space</label>
+                    <select
+                      value={selectedComponent.props?.whiteSpace || 'normal'}
+                      onChange={(e) => updateComponent(selectedComponent.id, {
+                        props: { ...selectedComponent.props, whiteSpace: e.target.value }
+                      })}
+                      className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                    >
+                      <option value="normal">normal</option>
+                      <option value="nowrap">nowrap</option>
+                      <option value="pre">pre</option>
+                      <option value="pre-wrap">pre-wrap</option>
+                      <option value="pre-line">pre-line</option>
+                    </select>
+                  </div>
+                  </div>
+      )}
+
+      {/* Right Sidebar - Frame Presets (when Frame tool active and nothing selected) */}
+      {rightSidebarVisible && !selectedComponent && activeTool === 'frame' && !isFullScreen && (
+        <div className="absolute top-0 right-0 h-full w-80 bg-white border-l border-gray-200 flex flex-col flex-shrink-0 z-60 shadow-lg">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-900">Frame Presets</h3>
+            <button onClick={() => setRightSidebarVisible(false)} className="text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div>
+              <div className="text-xs font-semibold text-gray-500 mb-2">iOS</div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { name: 'iPhone SE', width: 375, height: 667, type: 'mobile' as const, icon: Smartphone },
+                  { name: 'iPhone 14', width: 390, height: 844, type: 'mobile' as const, icon: Smartphone },
+                  { name: 'iPhone 14 Plus', width: 428, height: 926, type: 'mobile' as const, icon: Smartphone },
+                  { name: 'iPad', width: 768, height: 1024, type: 'tablet' as const, icon: Tablet }
+                ].map((preset) => (
+                  <button key={preset.name} onClick={() => handleAddScreen(preset)} className="border border-gray-200 rounded-lg p-2 hover:bg-gray-50 text-left flex items-center space-x-2">
+                    <preset.icon className="w-4 h-4 text-gray-600" />
+                    <div>
+                      <div className="text-xs font-medium text-gray-900">{preset.name}</div>
+                      <div className="text-[11px] text-gray-500">{preset.width} × {preset.height}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-gray-500 mb-2">Android</div>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { name: 'Android Small', width: 360, height: 640, type: 'mobile' as const, icon: Smartphone },
+                  { name: 'Android Medium', width: 411, height: 891, type: 'mobile' as const, icon: Smartphone },
+                  { name: 'Android Large', width: 480, height: 960, type: 'mobile' as const, icon: Smartphone }
+                ].map((preset) => (
+                  <button key={preset.name} onClick={() => handleAddScreen(preset)} className="border border-gray-200 rounded-lg p-2 hover:bg-gray-50 text-left flex items-center space-x-2">
+                    <preset.icon className="w-4 h-4 text-gray-600" />
+                    <div>
+                      <div className="text-xs font-medium text-gray-900">{preset.name}</div>
+                      <div className="text-[11px] text-gray-500">{preset.width} × {preset.height}</div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Main Canvas Area */}
-      <div className="flex-1 bg-gray-100 overflow-hidden relative">
-        {/* Canvas Toolbar */}
-        <div className="h-12 bg-white border-b border-gray-200 flex items-center justify-between px-4">
-          <div className="flex items-center space-x-4">
-            {/* Show Sidebar Button and Project Name (when hidden) */}
-            {!sidebarVisible && (
-              <div className="flex items-center space-x-3">
-              <button
-                onClick={() => setSidebarVisible(true)}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded"
-                title="Show sidebar"
-              >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                  </svg>
-            </button>
-                <div className="flex items-center space-x-2">
-                  <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                    <span className="text-xs font-bold text-white">C</span>
-                  </div>
+                {selectedComponent.type === 'button' && (
                   <div>
-                    <div className="text-sm font-medium text-gray-900">
-                      {loadingProject ? 'Loading...' : (projectInfo?.name || 'Untitled')}
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Button Text</label>
+                    <input
+                      type="text"
+                      value={selectedComponent.props?.text || ''}
+                      onChange={(e) => updateComponent(selectedComponent.id, { 
+                        props: { ...selectedComponent.props, text: e.target.value }
+                      })}
+                      className="w-full px-2 py-1 text-sm border border-gray-200 rounded"
+                    />
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Text Color</label>
+                        <input
+                          type="color"
+                          value={selectedComponent.props?.color || '#ffffff'}
+                          onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, color: e.target.value } })}
+                          className="w-full h-8 border border-gray-200 rounded cursor-pointer"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Variant</label>
+                        <select
+                          value={selectedComponent.props?.variant || 'primary'}
+                          onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, variant: e.target.value } })}
+                          className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                        >
+                          <option value="primary">Primary</option>
+                          <option value="secondary">Secondary</option>
+                          <option value="ghost">Ghost</option>
+                        </select>
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500">
-                      {projectInfo ? `${projectInfo.language} • ${projectInfo.device}` : 'Drafts'}
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Gradient End</label>
+                        <input
+                          type="text"
+                          placeholder="#8b5cf6"
+                          value={selectedComponent.props?.gradient || ''}
+                          onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, gradient: e.target.value } })}
+                          className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                        />
+                      </div>
+                    </div>
+                </div>
+                )}
+
+                {selectedComponent.type === 'text' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <label className="text-xs font-medium text-gray-700">Style</label>
+                      <button
+                        onClick={() => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, italic: !selectedComponent.props?.italic } })}
+                        className={`px-2 py-1 text-xs border rounded ${selectedComponent.props?.italic ? 'bg-blue-100 border-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}
+                      >Italic</button>
+                      <button
+                        onClick={() => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, underline: !selectedComponent.props?.underline } })}
+                        className={`px-2 py-1 text-xs border rounded ${selectedComponent.props?.underline ? 'bg-blue-100 border-blue-500' : 'border-gray-200 hover:bg-gray-50'}`}
+                      >Underline</button>
+                      <select
+                        value={selectedComponent.props?.textTransform || 'none'}
+                        onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, textTransform: e.target.value } })}
+                        className="px-2 py-1 text-xs border border-gray-200 rounded"
+                      >
+                        <option value="none">None</option>
+                        <option value="uppercase">Uppercase</option>
+                        <option value="lowercase">Lowercase</option>
+                        <option value="capitalize">Capitalize</option>
+                      </select>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
-            <span className="text-sm text-gray-600">
-              {screens.length} Screens • Active: {currentScreen?.name} ({currentScreen?.width}x{currentScreen?.height})
-            </span>
-            <div className="h-4 w-px bg-gray-300"></div>
-            <button className="text-sm text-gray-600 hover:text-gray-900">
-              <Eye className="h-4 w-4" />
-            </button>
-            <button className="text-sm text-gray-600 hover:text-gray-900">
-              <Move className="h-4 w-4" />
-            </button>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button 
-              onClick={() => setZoom(prev => Math.max(prev / 1.2, 0.1))}
-              className="p-1 text-gray-600 hover:text-gray-900"
-            >
-              <ZoomOut className="h-4 w-4" />
-            </button>
-            <span className="text-sm text-gray-600 min-w-[60px] text-center">
-              {Math.round(zoom * 100)}%
-            </span>
-            <button 
-              onClick={() => setZoom(prev => Math.min(prev * 1.2, 5))}
-              className="p-1 text-gray-600 hover:text-gray-900"
-            >
-              <ZoomIn className="h-4 w-4" />
-            </button>
-            <button 
-              onClick={() => {
-                setZoom(1)
-                setPan({ x: 0, y: 0 })
-              }}
-              className="p-1 text-gray-600 hover:text-gray-900"
-              title="Reset View"
-            >
-              <RotateCcw className="h-4 w-4" />
-            </button>
-            <button 
-              onClick={() => {
-                // Fit all screens to viewport using dynamic canvas size
-                const containerWidth = containerRef.current?.clientWidth || 800
-                const containerHeight = containerRef.current?.clientHeight || 600
-                const canvasDimensions = calculateCanvasSize()
-                const canvasWidth = parseInt(canvasDimensions.width)
-                const canvasHeight = parseInt(canvasDimensions.height)
-                
-                const scaleX = containerWidth / canvasWidth
-                const scaleY = containerHeight / canvasHeight
-                const newZoom = Math.min(scaleX, scaleY, 1) * 0.8 // 80% of fit
-                setZoom(newZoom)
-                setPan({ x: 0, y: 0 })
-              }}
-              className="p-1 text-gray-600 hover:text-gray-900"
-              title="Fit All Screens"
-            >
-              <Maximize2 className="h-4 w-4" />
-            </button>
-            <div className="h-4 w-px bg-gray-300"></div>
-            <button 
-              onClick={manualSave}
-              disabled={isSaving}
-              className={`text-sm flex items-center space-x-1 ${
-                isSaving 
-                  ? 'text-gray-400 cursor-not-allowed' 
-                  : savedIndicator
-                  ? 'text-green-600 cursor-default'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-              title="Save project (Ctrl+S)"
-            >
-              {isSaving ? (
-                <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              ) : savedIndicator ? (
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              ) : (
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-                </svg>
-              )}
-              <span>{isSaving ? 'Saving...' : savedIndicator ? 'Saved!' : 'Save'}</span>
-            </button>
-            <button className="text-sm text-gray-600 hover:text-gray-900">Undo</button>
-            <button className="text-sm text-gray-600 hover:text-gray-900">Redo</button>
-            <button 
-              onClick={() => {
-                console.log('Force reload triggered')
-                setHasLoadedData(false)
-                setIsLoadingData(false)
-                loadProjectData()
-              }}
-              className="text-sm text-red-600 hover:text-red-800"
-              title="Force reload project data (debug)"
-            >
-              Reload
-            </button>
-          </div>
-        </div>
-        {/* Canvas Area with Figma-style background */}
-        <div 
-          ref={containerRef}
-          className="flex-1 bg-gray-100 overflow-hidden relative"
-          style={{ 
-            height: 'calc(100vh - 48px)', // Subtract toolbar height
-            cursor: isPanning ? 'grabbing' : 'grab',
-            touchAction: 'none',
-            userSelect: 'none',
-            WebkitUserSelect: 'none',
-            MozUserSelect: 'none',
-            msUserSelect: 'none'
-          }}
-          onMouseDown={handleMouseDownPan}
-          onMouseMove={handleMouseMovePan}
-          onMouseUp={() => {
-            if (activeTool === 'select') {
-              handleMouseUpPan()
-            } else {
-              handleCanvasMouseUp()
-            }
-          }}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          {/* Pan indicator */}
-          {!isPanning && !draggedScreen && (
-            <div className="absolute top-4 right-4 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-              Trackpad to pan • Ctrl/Cmd + scroll to zoom • Drag screens to move • Click to select
-            </div>
-          )}
-          
-          {/* Panning indicator */}
-          {isPanning && (
-            <div className="absolute top-4 right-4 bg-blue-500 text-white text-xs px-2 py-1 rounded animate-pulse">
-              Panning... Release to stop
-            </div>
-          )}
-          
-          {/* Screen dragging indicator */}
-          {draggedScreen && (
-            <div className="absolute top-4 right-4 bg-green-500 text-white text-xs px-2 py-1 rounded animate-pulse">
-              Moving screen... Release to place
-            </div>
-          )}
-          
-          {/* Component drag indicator */}
-          {isDraggingFromLibrary && (
-            <div className="absolute top-4 right-4 bg-blue-500 text-white text-xs px-2 py-1 rounded animate-pulse">
-              Dragging {draggedComponentType}... Drop on screen
-            </div>
-          )}
-          
-          {/* Cross-screen component drag indicator */}
-          {isDraggingComponent && draggedComponent && (
-            <div className="absolute top-4 right-4 bg-purple-500 text-white text-xs px-2 py-1 rounded animate-pulse">
-              Moving {draggedComponent.name} to another screen...
-            </div>
-          )}
-          
-          {/* Figma-style dot background */}
-          <div />
-          
-          {/* Canvas Container - Clean Canvas like Logic Mode */}
-          <div 
-            className="absolute"
-            style={{
-              width: canvasSize.width,
-              height: canvasSize.height,
-              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-              transformOrigin: '0 0',
-              touchAction: 'none',
-              userSelect: 'none',
-              WebkitUserSelect: 'none',
-              MozUserSelect: 'none',
-              msUserSelect: 'none',
+                )}
 
-            }}
-          >
-            {/* Clean Canvas Background like Logic Mode */}
-            <div className="absolute inset-0 bg-gray-50" />
-            
-            {/* Debug Info */}
-            <div className="absolute top-4 left-4 bg-white bg-opacity-90 text-xs text-gray-700 px-2 py-1 rounded">
-              Canvas: {canvasSize.width} × {canvasSize.height} • Screens: {screens.length} • Zoom: {Math.round(zoom * 100)}%
-            </div>
-            
-            {/* Background element for pan events */}
-            <div 
-              className="absolute inset-0"
-              onMouseDown={(e) => {
-                if (activeTool === 'select') {
-                  handleMouseDownPan(e)
-                } else {
-                  handleCanvasMouseDown(e)
-                }
-              }}
-              onMouseMove={(e) => {
-                if (activeTool === 'select') {
-                  handleMouseMovePan(e)
-                } else {
-                  handleCanvasMouseMove(e)
-                }
-              }}
-              onMouseUp={() => {
-                if (activeTool === 'select') {
-                  handleMouseUpPan()
-                } else {
-                  handleCanvasMouseUp()
-                }
-              }}
-            />
-            
-            {/* Drawing Preview */}
-            {isDrawing && currentDrawing && (
-              <div
-                className="absolute border-2 border-blue-500 bg-blue-500 bg-opacity-20 pointer-events-none"
-                style={{
-                  left: currentDrawing.x,
-                  top: currentDrawing.y,
-                  width: Math.max(currentDrawing.width, 1),
-                  height: Math.max(currentDrawing.height, 1)
-                }}
-              />
-            )}
-            
-            {/* Empty State */}
-            {screens.length === 0 && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-3">Add Your First Screen</h3>
-                  <p className="text-sm text-gray-500 mb-4">Start designing your app by adding a screen</p>
-                  <button 
-                    onClick={() => setShowScreenSelector(true)}
-                    className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium transition-colors duration-200 shadow-sm hover:shadow-md"
-                  >
-                    Add Screen
+                {selectedComponent.type === 'image' && (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Image URL</label>
+                    <input
+                      type="text"
+                      placeholder="https://..."
+                      value={selectedComponent.props?.src || ''}
+                      onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, src: e.target.value } })}
+                      className="w-full px-2 py-1 text-sm border border-gray-200 rounded"
+                    />
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          const reader = new FileReader()
+                          reader.onload = () => {
+                            updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, src: String(reader.result || '') } })
+                          }
+                          reader.readAsDataURL(file)
+                        }}
+                        className="text-xs"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Alt Text</label>
+                        <input
+                          type="text"
+                          value={selectedComponent.props?.alt || ''}
+                          onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, alt: e.target.value } })}
+                          className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Fit</label>
+                        <select
+                          value={selectedComponent.props?.objectFit || 'cover'}
+                          onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, objectFit: e.target.value } })}
+                          className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                        >
+                          <option value="cover">Cover</option>
+                          <option value="contain">Contain</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {(selectedComponent.type === 'line' || selectedComponent.type === 'arrow') && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Line Color</label>
+                      <input
+                        type="color"
+                        value={selectedComponent.props?.lineColor || '#111827'}
+                        onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, lineColor: e.target.value } })}
+                        className="w-full h-8 border border-gray-200 rounded cursor-pointer"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Thickness</label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={selectedComponent.props?.thickness || 2}
+                        onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, thickness: Math.max(1, Number(e.target.value) || 1) } })}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {selectedComponent.type === 'input' && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Placeholder</label>
+                      <input
+                        type="text"
+                        value={selectedComponent.props?.placeholder || ''}
+                        onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, placeholder: e.target.value } })}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                      <select
+                        value={selectedComponent.props?.type || 'text'}
+                        onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, type: e.target.value } })}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                      >
+                        <option value="text">Text</option>
+                        <option value="email">Email</option>
+                        <option value="password">Password</option>
+                        <option value="number">Number</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {(selectedComponent.type === 'container' || selectedComponent.type === 'card') && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Padding</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={selectedComponent.props?.padding || 0}
+                        onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, padding: Number(e.target.value) } })}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                      />
+                    </div>
+                    <div className="flex items-end">
+                      <label className="text-xs font-medium text-gray-700 mr-2">Shadow</label>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(selectedComponent.props?.shadowBlur)}
+                        onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, shadowBlur: e.target.checked ? (selectedComponent.props?.shadowBlur || 12) : 0 } })}
+                        className="mt-1"
+                      />
+                    </div>
+                </div>
+                )}
+
+                {selectedComponent.type === 'frame' && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Platform</label>
+                      <select
+                        value={selectedComponent.props?.platform || 'android'}
+                        onChange={(e) => updateComponent(selectedComponent.id, { props: { ...selectedComponent.props, platform: e.target.value } })}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                      >
+                        <option value="android">Android</option>
+                        <option value="ios">iOS</option>
+                        <option value="web">Web</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Preset</label>
+                      <select
+                        value={selectedComponent.props?.preset || 'custom'}
+                        onChange={(e) => {
+                          const preset = e.target.value
+                          let width = selectedComponent.size.width
+                          let height = selectedComponent.size.height
+                          const platform = selectedComponent.props?.platform || 'android'
+                          // Common device ratios/sizes
+                          const presets: Record<string, { w: number; h: number }> = {
+                            // Android
+                            'android-small': { w: 360, h: 640 },
+                            'android-medium': { w: 411, h: 891 },
+                            'android-large': { w: 480, h: 960 },
+                            // iOS
+                            'ios-iphone-se': { w: 375, h: 667 },
+                            'ios-iphone-14': { w: 390, h: 844 },
+                            'ios-iphone-14-plus': { w: 428, h: 926 },
+                            'ios-ipad': { w: 768, h: 1024 },
+                            // Web
+                            'web-mobile': { w: 390, h: 844 },
+                            'web-tablet': { w: 768, h: 1024 },
+                            'web-desktop': { w: 1440, h: 900 }
+                          }
+                          let key = 'web-desktop'
+                          if (platform === 'android') key = 'android-medium'
+                          if (platform === 'ios') key = 'ios-iphone-14'
+                          if (preset !== 'custom') {
+                            const size = presets[preset] || presets[key]
+                            width = size.w
+                            height = size.h
+                          }
+                          updateComponent(selectedComponent.id, {
+                            props: { ...selectedComponent.props, preset },
+                            size: { width, height }
+                          })
+                        }}
+                        className="w-full px-2 py-1 text-xs border border-gray-200 rounded"
+                      >
+                        <option value="custom">Custom</option>
+                        <optgroup label="Android">
+                          <option value="android-small">Small (360×640)</option>
+                          <option value="android-medium">Medium (411×891)</option>
+                          <option value="android-large">Large (480×960)</option>
+                        </optgroup>
+                        <optgroup label="iOS">
+                          <option value="ios-iphone-se">iPhone SE (375×667)</option>
+                          <option value="ios-iphone-14">iPhone 14 (390×844)</option>
+                          <option value="ios-iphone-14-plus">iPhone 14 Plus (428×926)</option>
+                          <option value="ios-ipad">iPad (768×1024)</option>
+                        </optgroup>
+                        <optgroup label="Web">
+                          <option value="web-mobile">Mobile (390×844)</option>
+                          <option value="web-tablet">Tablet (768×1024)</option>
+                          <option value="web-desktop">Desktop (1440×900)</option>
+                        </optgroup>
+                      </select>
+                    </div>
+                </div>
+                )}
+
+                {/* Actions */}
+                <div className="pt-4 border-t border-gray-200">
+                  <div className="flex space-x-2">
+                  <button
+                      onClick={() => {
+                        const newComponent = { 
+                          ...selectedComponent, 
+                          id: `component-${Date.now()}`, 
+                          name: `${selectedComponent.name} Copy`,
+                          position: { 
+                            x: selectedComponent.position.x + 20, 
+                            y: selectedComponent.position.y + 20 
+                          }
+                        }
+    addComponent(newComponent)
+      setSelectedComponentId(newComponent.id)
+                      }}
+                      className="flex-1 px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                    >
+                      <Copy size={12} className="inline mr-1" />
+                      Copy
+                  </button>
+                  <button
+                      onClick={() => {
+                        deleteComponent(selectedComponent.id)
+                        setSelectedComponentId(null)
+                        setRightSidebarVisible(false)
+                      }}
+                      className="flex-1 px-2 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200"
+                    >
+                      <Trash2 size={12} className="inline mr-1" />
+                      Delete
                   </button>
                 </div>
               </div>
-            )}
-            
-            {/* Freely Positioned Screens like Logic Mode */}
-              {screens.map((screen, index) => {
-                const screenLayer = screen.layers.find(layer => layer.id === screen.activeLayer)
-              const screenPosition = screenPositions[screen.id] || { x: 100 + index * 50, y: 100 + index * 50 }
-                
-                return (
-                  <div
-                    key={screen.id}
-                    data-screen-id={screen.id}
-                    className={`absolute bg-white shadow-lg rounded-lg overflow-hidden ${
-                      activeScreen === screen.id ? 'ring-2 ring-blue-500' : 'ring-1 ring-gray-200'
-                    } ${draggedScreen === screen.id ? 'z-50' : 'z-10'}`}
-                    style={{ 
-                      width: screen.width || 400, 
-                      height: screen.height || 600,
-                      cursor: draggedScreen === screen.id ? 'grabbing' : (isPanning ? 'grabbing' : 'grab'),
-                    left: screenPosition.x,
-                    top: screenPosition.y,
-                      transform: draggedScreen === screen.id ? 'scale(1.02)' : 'scale(1)',
-                      transition: draggedScreen === screen.id ? 'none' : 'transform 0.2s ease-out',
-                    }}
-                    onClick={() => {
-                      if (!isPanning && !draggedScreen) {
-                        setActiveScreen(screen.id)
-                      }
-                    }}
-                    onMouseDown={(e) => handleScreenMouseDown(e, screen.id)}
-                    onDrop={handleScreenDrop}
-                    onDragOver={handleScreenDragOver}
-                  >
-                    {/* Screen Header */}
-                    <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                          activeScreen === screen.id ? 'bg-blue-500 text-white' : 'bg-gray-300 text-gray-600'
-                        }`}>
-                          {index + 1}
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <input
-                            type="text"
-                            value={screen.name}
-                            onChange={(e) => updateScreen(screen.id, { name: e.target.value })}
-                            className="text-xs font-medium text-gray-700 bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-500 focus:bg-white px-2 py-1 rounded min-w-0"
-                            onClick={(e) => e.stopPropagation()}
-                            onDoubleClick={(e) => e.stopPropagation()}
-                          />
-                          <span className="text-xs text-gray-500">({screen.width}x{screen.height})</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <span className="text-xs text-gray-500">{screen.type}</span>
-                      </div>
-                    </div>
-                    
-                    {/* Screen Content */}
-                    <div 
-                      className={`relative w-full h-full ${
-                        isDraggingFromLibrary ? 'bg-blue-50 border-2 border-dashed border-blue-300' : ''
-                      }`}
-                      style={{ height: `calc(100% - 40px)` }}
-                      onMouseUp={handleMouseUp}
-                      onMouseLeave={handleMouseUp}
-                      onDrop={handleScreenDrop}
-                      onDragOver={handleScreenDragOver}
-                      onClick={(e) => {
-                        if (activeScreen === screen.id) {
-                          handleCanvasClick(e)
-                        }
-                      }}
-                    >
-                      {screenLayer?.visible && screenLayer.components.map((component) => (
-                        <div
-                          key={component.id}
-                          draggable={isDraggingComponent && draggedComponent?.id === component.id}
-                          onDragStart={(e) => {
-                            if (isDraggingComponent && draggedComponent?.id === component.id) {
-                              e.dataTransfer.setData('draggedComponent', JSON.stringify(component))
-                              e.dataTransfer.effectAllowed = 'move'
-                              console.log('Starting cross-screen drag for component:', component.id)
-                            }
-                          }}
-                          onMouseDown={(e) => {
-                            if (activeScreen === screen.id) {
-                              e.stopPropagation()
-                              handleMouseDown(e, component)
-                            }
-                          }}
-                          className={`absolute border-2 select-none ${
-                            selectedComponent?.id === component.id && activeScreen === screen.id
-                              ? 'border-blue-500 z-10' 
-                              : 'border-gray-300 hover:border-gray-400'
-                          } ${component.interactions?.hover ? 'hover:scale-105 transition-transform' : ''}`}
-                          style={{
-                            left: component.position.x,
-                            top: component.position.y,
-                            width: component.size.width,
-                            height: component.size.height,
-                            userSelect: 'none',
-                            backgroundColor: component.backgroundColor,
-                            zIndex: component.zIndex || 1,
-                            cursor: isDragging && selectedComponent?.id === component.id ? 'grabbing' : 
-                                   isResizing && selectedComponent?.id === component.id ? 'grabbing' : 'grab',
-                            ...(component.interactions?.animation === 'fadeIn' && { animation: 'fadeIn 0.5s ease-in' }),
-                            ...(component.interactions?.animation === 'slideUp' && { animation: 'slideUp 0.5s ease-out' }),
-                            ...(component.interactions?.animation === 'bounce' && { animation: 'bounce 1s infinite' })
-                          }}
-                        >
-                          <div 
-                            className="w-full h-full pointer-events-none"
-                            style={{ pointerEvents: 'none' }}
-                          >
-                            {renderComponent(component)}
-                          </div>
-                          
-                          {/* Resize Handles - Only show when component is selected */}
-                          {selectedComponent?.id === component.id && activeScreen === screen.id && (
-                            <>
-                              {/* Corner handles */}
-                              <div
-                                className="absolute -top-1 -left-1 w-3 h-3 bg-blue-500 border border-white rounded cursor-nw-resize"
-                                onMouseDown={(e) => handleResizeStart(e, component, 'nw')}
-                              />
-                              <div
-                                className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 border border-white rounded cursor-ne-resize"
-                                onMouseDown={(e) => handleResizeStart(e, component, 'ne')}
-                              />
-                              <div
-                                className="absolute -bottom-1 -left-1 w-3 h-3 bg-blue-500 border border-white rounded cursor-sw-resize"
-                                onMouseDown={(e) => handleResizeStart(e, component, 'sw')}
-                              />
-                              <div
-                                className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-500 border border-white rounded cursor-se-resize"
-                                onMouseDown={(e) => handleResizeStart(e, component, 'se')}
-                              />
-                              
-                              {/* Edge handles */}
-                              <div
-                              className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-blue-500 border border-white rounded cursor-n-resize"
-                              onMouseDown={(e) => handleResizeStart(e, component, 'n')}
-                              />
-                              <div
-                              className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-3 h-3 bg-blue-500 border border-white rounded cursor-s-resize"
-                              onMouseDown={(e) => handleResizeStart(e, component, 's')}
-                              />
-                              <div
-                              className="absolute -left-1 top-1/2 transform -translate-y-1/2 w-3 h-3 bg-blue-500 border border-white rounded cursor-w-resize"
-                              onMouseDown={(e) => handleResizeStart(e, component, 'w')}
-                              />
-                              <div
-                              className="absolute -right-1 top-1/2 transform -translate-y-1/2 w-3 h-3 bg-blue-500 border border-white rounded cursor-e-resize"
-                              onMouseDown={(e) => handleResizeStart(e, component, 'e')}
-                              />
-                            </>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )
-              })}
-          </div>
-        </div>
-      </div>
-
-      {/* Right Panel - Properties */}
-      <div className={`transition-all duration-300 ease-in-out ${
-        selectedComponentData 
-          ? 'w-80 opacity-100 translate-x-0' 
-          : 'w-0 opacity-0 translate-x-full overflow-hidden'
-      }`}>
-        {selectedComponentData && (
-          <div key={selectedComponentData.id} className="w-80 bg-white border-l border-gray-200 flex flex-col">
-            <div className="p-4 border-b border-gray-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900">Properties</h3>
-                  <p className="text-xs text-gray-500 mt-1">{selectedComponentData.name}</p>
-                </div>
-        <button
-                  onClick={() => deleteSelectedComponent()}
-                  className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded"
-                  title="Delete component (Delete key)"
-        >
-                  <Trash2 className="h-4 w-4" />
-        </button>
-              </div>
             </div>
+            </div>
+        </div>
+          </div>
+        )}
 
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="space-y-4">
-                {/* Styling */}
-                <div>
-                  <h4 className="text-xs font-medium text-gray-700 mb-2">Styling</h4>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-xs text-gray-600">Width</label>
-                      <input
-                        type="number"
-                        value={selectedComponentData.size.width}
-                        onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                          size: { ...selectedComponentData.size, width: parseInt(e.target.value) || 0 }
-                        })}
-                        className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600">Height</label>
-                      <input
-                        type="number"
-                        value={selectedComponentData.size.height}
-                        onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                          size: { ...selectedComponentData.size, height: parseInt(e.target.value) || 0 }
-                        })}
-                        className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-600">Background Color</label>
-                      <input
-                        type="color"
-                        value={selectedComponentData.backgroundColor || '#ffffff'}
-                        onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                          backgroundColor: e.target.value
-                        })}
-                        className="w-full h-8 border border-gray-300 rounded"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Component Properties */}
-                <div>
-                  <h4 className="text-xs font-medium text-gray-700 mb-2">Properties</h4>
-                  <div className="space-y-2">
-                    {selectedComponentData.type === 'text' && (
-                      <>
-                        <div>
-                          <label className="text-xs text-gray-600">Heading</label>
-                          <input
-                            type="text"
-                            value={selectedComponentData.props?.heading || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, heading: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter heading text"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-600">Content</label>
-                          <textarea
-                            value={selectedComponentData.props?.content || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, content: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter content text"
-                            rows={3}
-                          />
-                        </div>
-                      </>
-                    )}
-                    
-                    {selectedComponentData.type === 'button' && (
-                      <>
-                        <div>
-                          <label className="text-xs text-gray-600">Button Text</label>
-                          <input
-                            type="text"
-                            value={selectedComponentData.props?.text || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, text: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter button text"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-600">Button Color</label>
-                          <input
-                            type="color"
-                            value={selectedComponentData.props?.color || '#3b82f6'}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, color: e.target.value }
-                            })}
-                            className="w-full h-8 border border-gray-300 rounded"
-                          />
-                        </div>
-                      </>
-                    )}
-                    
-                    {selectedComponentData.type === 'input' && (
-                      <>
-                        <div>
-                          <label className="text-xs text-gray-600">Placeholder</label>
-                          <input
-                            type="text"
-                            value={selectedComponentData.props?.placeholder || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, placeholder: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter placeholder text"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-600">Input Type</label>
-                          <select
-                            value={selectedComponentData.props?.type || 'text'}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, type: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                          >
-                            <option value="text">Text</option>
-                            <option value="email">Email</option>
-                            <option value="password">Password</option>
-                            <option value="number">Number</option>
-                          </select>
-                        </div>
-                      </>
-                    )}
-                    
-                    {selectedComponentData.type === 'image' && (
-                      <>
-                        <div>
-                          <label className="text-xs text-gray-600">Image URL</label>
-                          <input
-                            type="text"
-                            value={selectedComponentData.props?.src || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, src: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter image URL"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs text-gray-600">Alt Text</label>
-                          <input
-                            type="text"
-                            value={selectedComponentData.props?.alt || ''}
-                            onChange={(e) => updateComponentLocal(selectedComponentData.id, {
-                              props: { ...selectedComponentData.props, alt: e.target.value }
-                            })}
-                            className="w-full text-xs border border-gray-300 rounded px-2 py-1"
-                            placeholder="Enter alt text"
-                          />
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* Interactions */}
-                <div>
-                  <h4 className="text-xs font-medium text-gray-700 mb-2">Interactions</h4>
-                  <div className="space-y-2">
-                    {/* Current Interactions */}
-                    {selectedComponentData.interactions && Object.keys(selectedComponentData.interactions).length > 0 && (
-                      <div className="space-y-1 mb-3">
-                        {selectedComponentData.interactions.click && (
-                          <div className="flex items-center justify-between p-2 bg-blue-50 rounded text-xs">
-                            <span className="text-blue-700">Click: {selectedComponentData.interactions.click}</span>
-        <button
-                              onClick={() => removeInteraction(selectedComponentData.id, 'click')}
-                              className="text-blue-500 hover:text-blue-700"
-        >
-                              ×
-        </button>
-                          </div>
-                        )}
-                        {selectedComponentData.interactions.hover && (
-                          <div className="flex items-center justify-between p-2 bg-green-50 rounded text-xs">
-                            <span className="text-green-700">Hover: {selectedComponentData.interactions.hover}</span>
-        <button
-                              onClick={() => removeInteraction(selectedComponentData.id, 'hover')}
-                              className="text-green-500 hover:text-green-700"
-        >
-                              ×
-        </button>
-      </div>
-                        )}
-                        {selectedComponentData.interactions.animation && (
-                          <div className="flex items-center justify-between p-2 bg-purple-50 rounded text-xs">
-                            <span className="text-purple-700">Animation: {selectedComponentData.interactions.animation}</span>
-                            <button 
-                              onClick={() => removeInteraction(selectedComponentData.id, 'animation')}
-                              className="text-purple-500 hover:text-purple-700"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Add Interaction Buttons */}
-              <button
-                      onClick={() => addClickEvent(selectedComponentData.id)}
-                      className="w-full text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded px-2 py-1 hover:bg-blue-100"
-                    >
-                      + Add Click Event
-                    </button>
-                    <button 
-                      onClick={() => addHoverEffect(selectedComponentData.id)}
-                      className="w-full text-xs bg-green-50 text-green-700 border border-green-200 rounded px-2 py-1 hover:bg-green-100"
-                    >
-                      + Add Hover Effect
-                    </button>
-                    <button 
-                      onClick={() => addAnimation(selectedComponentData.id)}
-                      className="w-full text-xs bg-purple-50 text-purple-700 border border-purple-200 rounded px-2 py-1 hover:bg-purple-100"
-                    >
-                      + Add Animation
-                    </button>
-                  </div>
-                </div>
-
-                {/* Data Binding */}
-                <div>
-                  <h4 className="text-xs font-medium text-gray-700 mb-2">Data Binding</h4>
-                  <div className="space-y-2">
-                    {/* Current Data Bindings */}
-                    {selectedComponentData.dataBinding && Object.keys(selectedComponentData.dataBinding).length > 0 && (
-                      <div className="space-y-1 mb-3">
-                        {selectedComponentData.dataBinding.variable && (
-                          <div className="flex items-center justify-between p-2 bg-orange-50 rounded text-xs">
-                            <span className="text-orange-700">Variable: {selectedComponentData.dataBinding.variable}</span>
-                            <button 
-                              onClick={() => removeDataBinding(selectedComponentData.id, 'variable')}
-                              className="text-orange-500 hover:text-orange-700"
-                            >
-                              ×
-                            </button>
-                        </div>
-                        )}
-                        {selectedComponentData.dataBinding.api && (
-                          <div className="flex items-center justify-between p-2 bg-indigo-50 rounded text-xs">
-                            <span className="text-indigo-700">API: {selectedComponentData.dataBinding.api}</span>
-                            <button 
-                              onClick={() => removeDataBinding(selectedComponentData.id, 'api')}
-                              className="text-indigo-500 hover:text-indigo-700"
-                            >
-                              ×
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Add Data Binding Buttons */}
-                    <button 
-                      onClick={() => bindToVariable(selectedComponentData.id)}
-                      className="w-full text-xs bg-orange-50 text-orange-700 border border-orange-200 rounded px-2 py-1 hover:bg-orange-100"
-                    >
-                      + Bind to Variable
-                    </button>
-                    <button 
-                      onClick={() => connectToAPI(selectedComponentData.id)}
-                      className="w-full text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded px-2 py-1 hover:bg-indigo-100"
-                    >
-                      + Connect to API
-                    </button>
-                  </div>
-                </div>
-
-                {/* Layer Management */}
-                        <div>
-                  <h4 className="text-xs font-medium text-gray-700 mb-2">Layer</h4>
-                  <div className="space-y-2">
-                    <div className="flex space-x-1">
-                    <button
-                        onClick={() => bringToFront(selectedComponentData.id)}
-                        className="flex-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100"
-                        title="Bring to Front"
-                      >
-                        Front
-                    </button>
-                    <button
-                        onClick={() => bringForward(selectedComponentData.id)}
-                        className="flex-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100"
-                        title="Bring Forward"
-                      >
-                        ↑
-                    </button>
-                    <button
-                        onClick={() => sendBackward(selectedComponentData.id)}
-                        className="flex-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100"
-                        title="Send Backward"
-                      >
-                        ↓
-                    </button>
-                    <button
-                        onClick={() => sendToBack(selectedComponentData.id)}
-                        className="flex-1 text-xs bg-gray-50 text-gray-700 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100"
-                        title="Send to Back"
-                      >
-                        Back
-                    </button>
-                  </div>
-                </div>
-                        </div>
-                      </div>
-                        </div>
-                        </div>
-                    )}
-                        </div>
-
-      {/* Figma-like Toolbar */}
-      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white border border-gray-200 rounded-xl shadow-lg px-4 py-2 z-50">
-        <div className="flex items-center space-x-2">
-          {/* Select Tool */}
-          <button
-            onClick={() => handleToolSelect('select')}
-            className={`p-2 rounded-lg transition-all duration-200 ${
-              activeTool === 'select' 
-                ? 'bg-blue-500 text-white shadow-md' 
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-            title="Select (V)"
-          >
-            <MousePointer className="w-5 h-5" />
-          </button>
-
-          {/* Container Tool */}
-          <button
-            onClick={() => handleToolSelect('container')}
-            className={`p-2 rounded-lg transition-all duration-200 ${
-              activeTool === 'container' 
-                ? 'bg-blue-500 text-white shadow-md' 
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-            title="Container (C)"
-          >
-            <Container className="w-5 h-5" />
-          </button>
-
-          {/* Rectangle Tool */}
-          <button
-            onClick={() => handleToolSelect('rectangle')}
-            className={`p-2 rounded-lg transition-all duration-200 ${
-              activeTool === 'rectangle' 
-                ? 'bg-blue-500 text-white shadow-md' 
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-            title="Rectangle (R)"
-          >
-            <Square className="w-5 h-5" />
-          </button>
-
-          {/* Circle Tool */}
-          <button
-            onClick={() => handleToolSelect('circle')}
-            className={`p-2 rounded-lg transition-all duration-200 ${
-              activeTool === 'circle' 
-                ? 'bg-blue-500 text-white shadow-md' 
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-            title="Circle (O)"
-          >
-            <Circle className="w-5 h-5" />
-          </button>
-
-          {/* Triangle Tool */}
-          <button
-            onClick={() => handleToolSelect('triangle')}
-            className={`p-2 rounded-lg transition-all duration-200 ${
-              activeTool === 'triangle' 
-                ? 'bg-blue-500 text-white shadow-md' 
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-            title="Triangle"
-          >
-            <Triangle className="w-5 h-5" />
-          </button>
-
-          {/* Line Tool */}
-          <button
-            onClick={() => handleToolSelect('line')}
-            className={`p-2 rounded-lg transition-all duration-200 ${
-              activeTool === 'line' 
-                ? 'bg-blue-500 text-white shadow-md' 
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-            title="Line (L)"
-          >
-            <Minus className="w-5 h-5" />
-          </button>
-
-          {/* Text Tool */}
-          <button
-            onClick={() => handleToolSelect('text')}
-            className={`p-2 rounded-lg transition-all duration-200 ${
-              activeTool === 'text' 
-                ? 'bg-blue-500 text-white shadow-md' 
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-            title="Text (T)"
-          >
-            <Type className="w-5 h-5" />
-          </button>
-
-          {/* Image Tool */}
-          <button
-            onClick={() => handleToolSelect('image')}
-            className={`p-2 rounded-lg transition-all duration-200 ${
-              activeTool === 'image' 
-                ? 'bg-blue-500 text-white shadow-md' 
-                : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-            }`}
-            title="Image"
-          >
-            <Image className="w-5 h-5" />
-          </button>
-
-          {/* Pen Tool */}
-          <div className="w-px h-6 bg-gray-300 mx-2"></div>
-          
-          <button
-            className="p-2 rounded-lg bg-gray-50 text-gray-600 hover:bg-gray-100 transition-all duration-200"
-            title="Pen Tool (P)"
-          >
-            <PenTool className="w-5 h-5" />
-          </button>
-                        </div>
-      </div>
-
-      {/* Interactive Mode Shortcut Buttons */}
-      <div className="fixed bottom-4 right-4 flex space-x-2">
-        <button
-          onClick={() => navigateToMode('design')}
+      {/* Mode Navigation Buttons - Bottom Right */}
+      <div className="fixed bottom-4 right-4 flex space-x-2 z-50">
+                  <button
           className="flex items-center space-x-2 px-4 py-2 bg-orange-500 text-white rounded-lg shadow-lg hover:bg-orange-600 transition-colors"
-        >
+                  >
           <Layout className="h-4 w-4" />
           <span className="text-sm font-medium">Design</span>
-        </button>
-        <button
+                  </button>
+                  <button
           onClick={() => navigateToMode('logic')}
           className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg shadow-lg hover:bg-blue-600 transition-colors"
         >
@@ -4791,8 +4233,8 @@ export function DesignMode({ projectId }: DesignModeProps) {
         >
           <Code className="h-4 w-4" />
           <span className="text-sm font-medium">Code</span>
-          </button>
+                  </button>
         </div>
-    </div>
-  )
-} 
+      </div>
+    )
+  }

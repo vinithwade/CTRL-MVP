@@ -9,7 +9,10 @@ export interface Component {
   position: { x: number; y: number }
   size: { width: number; height: number }
   backgroundColor?: string
+  rotation?: number
   zIndex?: number
+  visible?: boolean
+  locked?: boolean
   interactions?: {
     click?: string
     hover?: string
@@ -96,6 +99,8 @@ interface DesignContextType {
   logicNodes: LogicNode[]
   connections: Connection[]
   screenPositions: {[key: string]: {x: number, y: number}}
+  loadDesignState: (state: { screens: Screen[]; activeScreen: string | null }) => void
+  loadLogicState: (state: { logicNodes: LogicNode[]; connections: Connection[] }) => void
   addComponent: (component: Component) => void
   updateComponent: (componentId: string, updates: Partial<Component>) => void
   deleteComponent: (componentId: string) => void
@@ -126,18 +131,50 @@ export function DesignProvider({ children }: { children: ReactNode }) {
   const [connections, setConnections] = useState<Connection[]>([])
   const [screenPositions, setScreenPositions] = useState<{[key: string]: {x: number, y: number}}>({})
 
+  const loadDesignState = (state: { screens: Screen[]; activeScreen: string | null }) => {
+    setScreens(state.screens || [])
+    setActiveScreen(state.activeScreen || null)
+  }
+
+  const loadLogicState = (state: { logicNodes: LogicNode[]; connections: Connection[] }) => {
+    setLogicNodes(state.logicNodes || [])
+    setConnections(state.connections || [])
+  }
+
   const addComponent = (component: Component) => {
     setComponents(prev => [...prev, component])
   }
 
   const updateComponent = (componentId: string, updates: Partial<Component>) => {
-    setComponents(prev => prev.map(comp => 
-      comp.id === componentId ? { ...comp, ...updates } : comp
+    // Update global components list
+    setComponents(previousComponents => previousComponents.map(existingComponent =>
+      existingComponent.id === componentId ? { ...existingComponent, ...updates } : existingComponent
     ))
+
+    // Update component inside any screen layer that contains it
+    setScreens(previousScreens => previousScreens.map(existingScreen => ({
+      ...existingScreen,
+      layers: existingScreen.layers.map(existingLayer => ({
+        ...existingLayer,
+        components: existingLayer.components.map(layerComponent =>
+          layerComponent.id === componentId ? { ...layerComponent, ...updates } : layerComponent
+        )
+      }))
+    })))
   }
 
   const deleteComponent = (componentId: string) => {
-    setComponents(prev => prev.filter(comp => comp.id !== componentId))
+    // Remove from global components list
+    setComponents(previousComponents => previousComponents.filter(existingComponent => existingComponent.id !== componentId))
+
+    // Remove from all screen layers
+    setScreens(previousScreens => previousScreens.map(existingScreen => ({
+      ...existingScreen,
+      layers: existingScreen.layers.map(existingLayer => ({
+        ...existingLayer,
+        components: existingLayer.components.filter(layerComponent => layerComponent.id !== componentId)
+      }))
+    })))
   }
 
   const addScreen = (screen: Screen) => {
@@ -171,9 +208,12 @@ export function DesignProvider({ children }: { children: ReactNode }) {
   const getComponentsByScreen = (screenId: string) => {
     const screen = screens.find(s => s.id === screenId)
     if (!screen) return []
-    
-    // Get all components from all layers in the screen
-    return screen.layers.flatMap(layer => layer.components)
+
+    // Return components only from visible layers and visible components
+    return screen.layers
+      .filter(layer => layer.visible)
+      .flatMap(layer => layer.components)
+      .filter(component => component.visible !== false)
   }
 
   const addLogicNode = (node: LogicNode) => {
@@ -219,6 +259,8 @@ export function DesignProvider({ children }: { children: ReactNode }) {
       logicNodes,
       connections,
       screenPositions,
+      loadDesignState,
+      loadLogicState,
       addComponent,
       updateComponent,
       deleteComponent,

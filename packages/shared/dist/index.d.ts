@@ -1,3 +1,5 @@
+export * from './types/SharedModel';
+export { ModelSyncEngine } from './core/ModelSync';
 export interface User {
     id: string;
     name: string;

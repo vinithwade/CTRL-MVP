@@ -5,13 +5,13 @@
 @layer base {
   html {
     font-family: 'Inter', system-ui, sans-serif;
-    font-weight: 600;
+    font-weight: 500;
   }
   
   body {
     @apply bg-gray-50 text-gray-900;
     font-family: 'Inter', system-ui, sans-serif;
-    font-weight: 600;
+    font-weight: 500;
   }
 }
 
@@ -101,8 +101,9 @@
   transition: all 0.2s ease-in-out;
 }
 
+/* Disable hover transform to prevent conflicts during drag (causes jitter)
+   Keep subtle shadow only. */
 .component-hover:hover {
-  transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 

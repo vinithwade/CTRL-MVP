@@ -62,6 +62,22 @@ export class ProjectService {
     return data || []
   }
 
+  // Get a specific project by ID
+  static async getProject(projectId: string): Promise<Project | null> {
+    const { data, error } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .single()
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+      console.error('Error fetching project:', error)
+      throw new Error(error.message)
+    }
+
+    return data
+  }
+
   // Create a new project
   static async createProject(projectData: { name: string; language: string; device: string }): Promise<Project> {
     try {
@@ -292,10 +308,10 @@ export class ProjectService {
 
     const result = {
       project,
-      designData: projectData?.find(d => d.data_type === 'design'),
-      logicData: projectData?.find(d => d.data_type === 'logic'),
-      codeData: projectData?.find(d => d.data_type === 'code'),
-      settingsData: projectData?.find(d => d.data_type === 'settings')
+      designData: projectData?.find((d: ProjectData) => d.data_type === 'design'),
+      logicData: projectData?.find((d: ProjectData) => d.data_type === 'logic'),
+      codeData: projectData?.find((d: ProjectData) => d.data_type === 'code'),
+      settingsData: projectData?.find((d: ProjectData) => d.data_type === 'settings')
     }
 
     return result

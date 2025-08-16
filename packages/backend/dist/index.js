@@ -5,10 +5,14 @@ import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import path from 'path';
+import fs from 'fs';
 import aiRoutes from './routes/ai.js';
+import codeRoutes from './routes/code.js';
 import userRoutes from './routes/users.js';
 import dashboardRoutes from './routes/dashboard.js';
 import settingsRoutes from './routes/settings.js';
+import projectRoutes from './routes/projects.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFound } from './middleware/notFound.js';
 dotenv.config();
@@ -94,9 +98,11 @@ app.get('/health', (req, res) => {
     });
 });
 app.use('/api/ai', aiRoutes);
+app.use('/api/code', codeRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/projects', projectRoutes);
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
     socket.on('join-room', (room) => {
@@ -140,12 +146,23 @@ io.on('connection', (socket) => {
 });
 app.use(notFound);
 app.use(errorHandler);
-const PORT = process.env.PORT || 5001;
+const portEnv = process.env.PORT || process.env.BACKEND_PORT;
+const PORT = typeof portEnv === 'string' ? parseInt(portEnv, 10) : (portEnv || 5001);
 const serverInstance = server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📊 Health check: http://localhost:${PORT}/health`);
     console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
 });
+try {
+    const deploymentsDir = path.resolve(process.cwd(), 'deployments');
+    if (!fs.existsSync(deploymentsDir))
+        fs.mkdirSync(deploymentsDir, { recursive: true });
+    app.use('/api/code/deployments', express.static(deploymentsDir));
+    console.log(`📦 Serving deployments from ${deploymentsDir}`);
+}
+catch (e) {
+    console.warn('Could not initialize deployments static server:', e);
+}
 process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down gracefully...');
     serverInstance.close(() => {

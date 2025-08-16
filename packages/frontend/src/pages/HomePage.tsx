@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useState, useEffect, useRef } from 'react'
 import { AuthModal } from '../components/AuthModal'
 
-export function HomePage() {
+function HomePage() {
   const { isLoggedIn } = useAuth()
   const navigate = useNavigate()
   const [authModalOpen, setAuthModalOpen] = useState(false)
@@ -561,4 +561,6 @@ export function HomePage() {
       />
     </div>
   )
-} 
+}
+
+export default HomePage 

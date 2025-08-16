@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Save, Bell, Shield, Palette, Database } from 'lucide-react'
 
-export function SettingsPage() {
+function SettingsPage() {
   const [settings, setSettings] = useState({
     notifications: true,
     darkMode: false,
@@ -177,4 +177,6 @@ export function SettingsPage() {
       </div>
     </div>
   )
-} 
+}
+
+export default SettingsPage 

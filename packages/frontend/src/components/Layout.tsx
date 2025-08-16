@@ -1,5 +1,5 @@
 import { ReactNode, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, Outlet } from 'react-router-dom'
 import { AuthModal } from './AuthModal'
 import { 
   Sparkles,
@@ -12,7 +12,7 @@ import {
 import { useAuth } from '../hooks/useAuth'
 
 interface LayoutProps {
-  children: ReactNode
+  children?: ReactNode
 }
 
 const navigation = [
@@ -20,7 +20,7 @@ const navigation = [
   { name: 'AI Assistant', href: '/ai' },
 ]
 
-export function Layout({ children }: LayoutProps) {
+function Layout({ children }: LayoutProps = {}) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [authModalOpen, setAuthModalOpen] = useState(false)
   const [authModalMode, setAuthModalMode] = useState<'login' | 'signup'>('login')
@@ -72,6 +72,8 @@ export function Layout({ children }: LayoutProps) {
                 )
               })}
             </nav>
+
+
 
             {/* Desktop Auth & Social */}
             <div className="hidden md:flex items-center space-x-4">
@@ -224,7 +226,7 @@ export function Layout({ children }: LayoutProps) {
 
       {/* Main Content */}
       <main className="flex-1">
-        {children}
+        {children || <Outlet />}
       </main>
 
       {/* Footer */}
@@ -246,7 +248,8 @@ export function Layout({ children }: LayoutProps) {
       />
 
       {/* Debug Components */}
-      {/* <TableSchemaTest /> */}
     </div>
   )
-} 
+}
+
+export default Layout 

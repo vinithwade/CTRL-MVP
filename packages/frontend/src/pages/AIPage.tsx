@@ -8,7 +8,7 @@ interface Message {
   timestamp: Date
 }
 
-export function AIPage() {
+function AIPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -34,17 +34,36 @@ export function AIPage() {
     setInput('')
     setIsLoading(true)
 
-    // Simulate AI response (replace with actual API call)
-    setTimeout(() => {
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: input })
+      })
+
+      if (!res.ok) {
+        throw new Error(`AI error: ${res.status}`)
+      }
+      const json = await res.json()
+      const content: string = json?.data?.content || 'No response generated.'
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        content: `I understand you said: "${input}". This is a simulated response. In a real implementation, this would connect to your AI service.`,
+        content,
         role: 'assistant',
         timestamp: new Date()
       }
       setMessages(prev => [...prev, aiMessage])
+    } catch (err) {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: `I encountered an error reaching the AI service. Falling back to local response. You said: "${input}"`,
+        role: 'assistant',
+        timestamp: new Date()
+      }
+      setMessages(prev => [...prev, aiMessage])
+    } finally {
       setIsLoading(false)
-    }, 1000)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -166,4 +185,6 @@ export function AIPage() {
       </div>
     </div>
   )
-} 
+}
+
+export default AIPage 

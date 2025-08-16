@@ -20,7 +20,7 @@ import {
 const LANGUAGES = ['JavaScript', 'TypeScript', 'Python', 'Dart', 'React', 'Vue', 'Angular']
 const DEVICES = ['Phone', 'Tablet', 'Desktop', 'Web']
 
-export function UserDashboardPage() {
+function UserDashboardPage() {
   const { user } = useAuth()
   const [projects, setProjects] = useState<Project[]>([])
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -535,3 +535,5 @@ export function UserDashboardPage() {
     </div>
   )
 }
+
+export default UserDashboardPage

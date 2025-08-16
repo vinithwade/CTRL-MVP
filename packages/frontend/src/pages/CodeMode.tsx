@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigation } from '@/contexts/NavigationContext'
+import { validateProject, lintProject, deployProject } from '@/services/deployService'
 import { useDesign } from '@/contexts/DesignContext'
+import { ProjectService } from '@/services/projectService'
 import { 
   FileText, 
   Folder, 
@@ -18,8 +20,9 @@ import {
   Globe,
   Zap,
   Download,
-  Play,
-  Layout
+  Smartphone,
+  Layout,
+  RotateCcw
 } from 'lucide-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -44,7 +47,11 @@ interface EditorTab {
   isDirty: boolean
 }
 
-export function CodeMode() {
+interface CodeModeProps {
+  projectId?: string
+}
+
+export function CodeMode({ projectId }: CodeModeProps) {
   const { navigateToMode } = useNavigation()
   const { components, screens, logicNodes, connections } = useDesign()
   const [activeTab, setActiveTab] = useState<string | null>('App.tsx')
@@ -54,6 +61,196 @@ export function CodeMode() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedFiles, setGeneratedFiles] = useState<FileNode[]>([])
   const [generationMessage, setGenerationMessage] = useState('')
+  // Auto-sync toggle to prevent continuous regeneration unless explicitly enabled
+  const [autoSync, setAutoSync] = useState(false)
+  const lastDesignHashRef = useRef<string | null>(null)
+  const [deploying, setDeploying] = useState(false)
+  const [provider, setProvider] = useState<'local' | 'netlify' | 'vercel'>('local')
+  const [isLoadingData, setIsLoadingData] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Preview and terminal state (moved up for persistence references)
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [previewLoading, setPreviewLoading] = useState(false)
+  const [deviceModel, setDeviceModel] = useState<'iphone-14' | 'iphone-15' | 'iphone-se' | 'ipad' | 'desktop'>('iphone-14')
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait')
+  const [fileExplorer, setFileExplorer] = useState<FileNode[]>([
+    {
+      id: '1',
+      name: 'src',
+      type: 'folder',
+      path: '/src',
+      isOpen: true,
+      children: [
+        {
+          id: '2',
+          name: 'components',
+          type: 'folder',
+          path: '/src/components',
+          isOpen: false,
+          children: [
+            {
+              id: '3',
+              name: 'Button.tsx',
+              type: 'file',
+              path: '/src/components/Button.tsx',
+              language: 'typescript',
+              content: `import React from 'react';
+
+interface ButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary';
+  size?: 'sm' | 'md' | 'lg';
+}
+
+export const Button: React.FC<ButtonProps> = ({
+  children,
+  onClick,
+  variant = 'primary',
+  size = 'md'
+}) => {
+  const className = 'btn-' + variant + ' ' + 'btn-' + size;
+  return (
+    <button
+      onClick={onClick}
+      className={className}
+    >
+      {children}
+    </button>
+  );
+};`
+            }
+          ]
+        },
+        {
+          id: '4',
+          name: 'App.tsx',
+          type: 'file',
+          path: '/src/App.tsx',
+          language: 'typescript',
+          content: `import React from 'react';
+import { Button } from './components/Button';
+
+function App() {
+  return (
+    <div className="App">
+      <h1>Welcome to CTRL</h1>
+      <Button onClick={() => console.log('Hello!')}>
+        Click me
+      </Button>
+    </div>
+  );
+}
+
+export default App;`
+        }
+      ]
+    },
+    {
+      id: '5',
+      name: 'package.json',
+      type: 'file',
+      path: '/package.json',
+      language: 'json',
+      content: `{
+  "name": "ctrl-app",
+  "version": "1.0.0",
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^5.0.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  }
+}`
+    }
+  ])
+  const [terminalOutput, setTerminalOutput] = useState<string[]>([
+    'Welcome to CTRL Code Mode Terminal',
+    'Type "help" for available commands',
+    '',
+    '> '
+  ])
+  const [terminalInput, setTerminalInput] = useState('')
+  const [showTerminal, setShowTerminal] = useState(false)
+  const [showProblems] = useState(false)
+  const [problems] = useState([
+    { id: '1', type: 'error', message: 'Cannot find module \'./components/Button\'', file: 'App.tsx', line: 2 },
+    { id: '2', type: 'warning', message: 'Unused variable \'variant\'', file: 'Button.tsx', line: 8 }
+  ])
+
+  // Persistence: load code state
+  const loadCodeData = useCallback(async () => {
+    if (!projectId || isLoadingData) return
+    setIsLoadingData(true)
+    try {
+      const codeData = await ProjectService.getProjectData(projectId, 'code')
+      if (codeData?.data) {
+        const data = codeData.data
+        if (Array.isArray(data.tabs)) setTabs(data.tabs)
+        if (typeof data.activeTab === 'string' || data.activeTab === null) setActiveTab(data.activeTab)
+        if (Array.isArray(data.generatedFiles)) setGeneratedFiles(data.generatedFiles)
+        if (Array.isArray(data.fileExplorer)) setFileExplorer(data.fileExplorer)
+        if (Array.isArray(data.terminalOutput)) setTerminalOutput(data.terminalOutput)
+        if (typeof data.showTerminal === 'boolean') setShowTerminal(data.showTerminal)
+        if (typeof data.showPreview === 'boolean') setShowPreview(data.showPreview)
+      }
+    } catch (err) {
+      console.error('Error loading code data:', err)
+    } finally {
+      setIsLoadingData(false)
+    }
+  }, [projectId, isLoadingData])
+
+  useEffect(() => {
+    if (projectId) loadCodeData()
+  }, [projectId, loadCodeData])
+
+  const saveCodeData = useCallback(async () => {
+    if (!projectId || isLoadingData || isSaving) return
+    setIsSaving(true)
+    try {
+      const data = {
+        tabs,
+        activeTab,
+        generatedFiles,
+        fileExplorer,
+        terminalOutput,
+        showTerminal,
+        showPreview,
+        timestamp: Date.now()
+      }
+      await ProjectService.saveProjectData(projectId, 'code', data)
+    } catch (err) {
+      console.error('Error saving code data:', err)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [projectId, isLoadingData, isSaving, tabs, activeTab, generatedFiles, fileExplorer, terminalOutput, showTerminal, showPreview])
+
+  // Auto-save
+  useEffect(() => {
+    if (!projectId) return
+    const i = setInterval(() => saveCodeData(), 30000)
+    return () => clearInterval(i)
+  }, [projectId, saveCodeData])
+
+  // Save on unload/visibility
+  useEffect(() => {
+    if (!projectId) return
+    const handler = () => saveCodeData()
+    window.addEventListener('visibilitychange', handler)
+    window.addEventListener('beforeunload', handler)
+    return () => {
+      window.removeEventListener('visibilitychange', handler)
+      window.removeEventListener('beforeunload', handler)
+    }
+  }, [projectId, saveCodeData])
 
 
   const generateCodeFromDesign = useCallback(() => {
@@ -198,6 +395,35 @@ export function CodeMode() {
     // Generate new code
     generateCodeFromDesign()
   }, [generateCodeFromDesign])
+
+  
+
+  // Auto-sync (optional): regenerate when design changes and no dirty generated tabs
+  useEffect(() => {
+    if (!autoSync || isGenerating) return
+    const dirtyGeneratedTabIds = new Set(tabs.filter(t => t.isDirty).map(t => t.id))
+    const generatedIds = new Set([
+      'app-component', 'all-components', 'styles', 'main-tsx', 'package-json', 'index-html', 'vite-config', 'ts-config'
+    ])
+    const hasDirtyGeneratedTabs = Array.from(dirtyGeneratedTabIds).some(id => generatedIds.has(id))
+    if (hasDirtyGeneratedTabs) return
+
+    // Create a stable hash of the design state to avoid repeated regenerations
+    const designHash = JSON.stringify({
+      components: components.map(c => ({ id: c.id, type: c.type, props: c.props, position: c.position, size: c.size })),
+      screens: screens.map(s => ({ id: s.id, width: s.width, height: s.height, type: s.type })),
+      logicNodes,
+      connections
+    })
+    if (lastDesignHashRef.current === designHash) return
+    lastDesignHashRef.current = designHash
+
+    if (generatedFiles.length === 0) {
+      generateCodeFromDesign()
+    } else {
+      regenerateCode()
+    }
+  }, [autoSync, isGenerating, components, screens, logicNodes, connections, tabs, generateCodeFromDesign, regenerateCode, generatedFiles.length])
 
   const generateAppComponent = (components: any[]): string => {
     // Generate logic functions based on connections
@@ -838,53 +1064,61 @@ jspm_packages/
   }
 
   const runProject = () => {
-    if (generatedFiles.length === 0) return
-    
     setPreviewLoading(true)
-    
-    // Create a complete HTML document with the generated code
+
+    // Create a complete HTML document from current design/logic (real-time)
     const htmlContent = createPreviewHTML()
-    
-    // Create a blob URL for the preview
-    const blob = new Blob([htmlContent], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    setPreviewUrl(url)
-    
-    // Show preview after a short delay to simulate loading
-    setTimeout(() => {
-      setShowPreview(true)
-      setPreviewLoading(false)
-      
-      // Update terminal output
-      const newOutput = [...terminalOutput, '$ npm run dev']
-      newOutput.push('Starting development server...')
-      newOutput.push('✓ Server running on http://localhost:3000')
-      newOutput.push('✓ Project built successfully!')
-      newOutput.push('✓ Preview opened in new window')
-      newOutput.push('', '> ')
-      setTerminalOutput(newOutput)
-    }, 1500)
+
+    // Determine simulator window size based on device and orientation
+    const getSimulatorSize = () => {
+      const map: Record<string, { portrait: { w: number; h: number }, landscape: { w: number; h: number } }> = {
+        'iphone-14': { portrait: { w: 430, h: 932 }, landscape: { w: 932, h: 430 } },
+        'iphone-15': { portrait: { w: 430, h: 932 }, landscape: { w: 932, h: 430 } },
+        'iphone-se': { portrait: { w: 320, h: 568 }, landscape: { w: 568, h: 320 } },
+        'ipad': { portrait: { w: 768, h: 1024 }, landscape: { w: 1024, h: 768 } },
+        'desktop': { portrait: { w: 1280, h: 800 }, landscape: { w: 1440, h: 900 } }
+      }
+      const model = map[deviceModel] || map['desktop']
+      return orientation === 'portrait' ? model.portrait : model.landscape
+    }
+    const { w, h } = getSimulatorSize()
+
+    // Open simulator popup and write compiled HTML
+    const features = `width=${Math.round(w + 80)},height=${Math.round(h + 160)},resizable=yes,scrollbars=yes` 
+    const win = window.open('', 'CTRL_Simulator', features)
+    if (win) {
+      win.document.open()
+      win.document.write(htmlContent)
+      win.document.close()
+      win.focus()
+    }
+
+    setPreviewLoading(false)
+    const newOutput = [...terminalOutput, '$ simulate:ios']
+    newOutput.push('Launching iOS simulator window...')
+    newOutput.push('✓ Simulator opened')
+    newOutput.push('', '> ')
+    setTerminalOutput(newOutput)
   }
 
   const createPreviewHTML = () => {
-    // Find the generated files
-    const appFile = generatedFiles.find(f => f.id === 'app-component')
-    const componentsFile = generatedFiles.find(f => f.id === 'all-components')
-    const stylesFile = generatedFiles.find(f => f.id === 'styles')
-    
-    if (!appFile?.content || !componentsFile?.content || !stylesFile?.content) {
-      return '<html><body><h1>Error: Generated files not found or empty</h1></body></html>'
-    }
+    // Device selection overrides screen type when set
+    const screenType = deviceModel === 'desktop' ? 'desktop' : (['iphone-14','iphone-15','iphone-se','ipad'].includes(deviceModel) ? (deviceModel === 'ipad' ? 'tablet' : 'mobile') : (screens.length > 0 ? screens[0].type : 'desktop'))
 
-    // Get the screen type from the first screen (or default to desktop)
-    const screenType = screens.length > 0 ? screens[0].type : 'desktop'
+    // Generate fresh code from current design/logic
+    const componentsSource = generateAllComponentsCode(components)
+    const appSource = generateAppComponent(components)
+    const stylesCode = generateStylesCode(components)
 
-    // Extract the component code from the generated files
-    const componentsCode = componentsFile.content.replace('import React from \'react\';\n\n', '')
-      .replace('\n\n// Export all components\nexport { ' + components.map(comp => comp.name).join(', ') + ' };', '')
-    
-    const appCode = appFile.content.replace('import React from \'react\';\nimport { ' + components.map(comp => comp.name).join(', ') + ' } from \'./components\';\nimport \'./styles.css\';\n\n', '')
-      .replace('\n\nexport default App;', '')
+    // Strip module headers/exports so we can inline into the preview runtime
+    const componentNames = components.map(comp => comp.name)
+    const componentsCode = componentsSource
+      .replace("import React from 'react';\n\n", '')
+      .replace(`\n\n// Export all components\nexport { ${componentNames.join(', ')} };`, '')
+
+    const appCode = appSource
+      .replace(`import React, { useState, useEffect } from 'react'\nimport './styles.css'\n\n`, '')
+      .replace('\nexport default App', 'export default App') // no-op guard
 
     // Create a simple fallback HTML for components
     const fallbackHTML = components.map(component => {
@@ -1007,8 +1241,8 @@ jspm_packages/
         case 'mobile':
           return `
             .device-frame {
-              width: 375px;
-              height: 667px;
+              width: ${deviceModel === 'iphone-se' ? (orientation === 'portrait' ? '320px' : '568px') : '375px'};
+              height: ${deviceModel === 'iphone-se' ? (orientation === 'portrait' ? '568px' : '320px') : '667px'};
               border: 8px solid #1f2937;
               border-radius: 25px;
               background: #000;
@@ -1021,13 +1255,13 @@ jspm_packages/
             .device-frame::before {
               content: '';
               position: absolute;
-              top: 10px;
+              top: ${deviceModel === 'iphone-14' || deviceModel === 'iphone-15' ? '0' : '10px'};
               left: 50%;
               transform: translateX(-50%);
-              width: 60px;
-              height: 4px;
-              background: #374151;
-              border-radius: 2px;
+              width: ${deviceModel === 'iphone-14' || deviceModel === 'iphone-15' ? '160px' : '60px'};
+              height: ${deviceModel === 'iphone-14' || deviceModel === 'iphone-15' ? '34px' : '4px'};
+              background: #111827;
+              border-radius: ${deviceModel === 'iphone-14' || deviceModel === 'iphone-15' ? '20px' : '2px'};
               z-index: 10;
             }
             .device-screen {
@@ -1409,7 +1643,7 @@ jspm_packages/
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        ${stylesFile.content}
+        ${stylesCode}
         
         /* Preview specific styles */
         body {
@@ -1508,10 +1742,7 @@ jspm_packages/
     </style>
 </head>
 <body>
-    <div class="preview-header">
-        <div class="preview-title">CTRL Generated App Preview - ${screenType.charAt(0).toUpperCase() + screenType.slice(1)}</div>
-        <button class="preview-close" onclick="window.close()">Close Preview</button>
-    </div>
+    <div class="preview-header" style="display:none"></div>
     
     <div class="preview-container">
         <div class="device-frame">
@@ -1828,7 +2059,8 @@ jspm_packages/
       setPreviewUrl('')
     }
   }
-  const [fileExplorer, setFileExplorer] = useState<FileNode[]>([
+  // moved earlier
+  const [fileExplorerLegacy, setFileExplorerLegacy] = useState<FileNode[]>([
     {
       id: '1',
       name: 'src',
@@ -1922,19 +2154,16 @@ export default App;`
 }`
     }
   ])
-  const [terminalOutput, setTerminalOutput] = useState<string[]>([
+  const [terminalOutputLegacy, setTerminalOutputLegacy] = useState<string[]>([
     'Welcome to CTRL Code Mode Terminal',
     'Type "help" for available commands',
     '',
     '> '
   ])
-  const [terminalInput, setTerminalInput] = useState('')
-  const [showTerminal, setShowTerminal] = useState(false)
-  const [showProblems] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
-  const [previewUrl, setPreviewUrl] = useState('')
-  const [previewLoading, setPreviewLoading] = useState(false)
-  const [problems] = useState([
+  const [terminalInputLegacy, setTerminalInputLegacy] = useState('')
+  const [showTerminalLegacy, setShowTerminalLegacy] = useState(false)
+  const [showProblemsLegacy] = useState(false)
+  const [problemsLegacy] = useState([
     { id: '1', type: 'error', message: 'Cannot find module \'./components/Button\'', file: 'App.tsx', line: 2 },
     { id: '2', type: 'warning', message: 'Unused variable \'variant\'', file: 'Button.tsx', line: 8 }
   ])
@@ -2158,6 +2387,15 @@ export default App;`
         return 'typescript'
     }
   }
+
+  // Ensure we persist edits frequently
+  useEffect(() => {
+    if (!projectId) return
+    const handler = setTimeout(() => {
+      saveCodeData()
+    }, 800)
+    return () => clearTimeout(handler)
+  }, [projectId, tabs, generatedFiles, fileExplorer, activeTab, terminalOutput, showTerminal, showPreview, saveCodeData])
 
   const handleTerminalCommand = (command: string) => {
     const newOutput = [...terminalOutput, `$ ${command}`]
@@ -2474,7 +2712,7 @@ export default App;`
   }
 
   return (
-    <div className="h-screen bg-white flex flex-col font-['Inter'] font-semibold">
+    <div className="h-screen bg-white flex flex-col font-['Inter'] font-semibold" data-orientation={orientation}>
       {/* Top Bar */}
       <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
         <div className="flex items-center space-x-4">
@@ -2509,13 +2747,47 @@ export default App;`
             <span>Regenerate</span>
           </button>
           
+          <label className="flex items-center space-x-2 text-xs text-gray-700 ml-2">
+            <input type="checkbox" checked={autoSync} onChange={(e) => setAutoSync(e.target.checked)} />
+            <span>Auto Sync</span>
+          </label>
+
           <button
-            onClick={runProject}
-            disabled={generatedFiles.length === 0}
-            className="flex items-center space-x-2 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => {
+              if (generatedFiles.length === 0) {
+                generateCodeFromDesign()
+              }
+              runProject()
+            }}
+            className="flex items-center space-x-2 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+            title="Preview"
           >
-            <Play className="w-4 h-4" />
-            <span>Run Project</span>
+            <Smartphone className="w-4 h-4" />
+            <span>Preview</span>
+          </button>
+
+          {/* Device Picker */}
+          <select
+            value={deviceModel}
+            onChange={(e) => setDeviceModel(e.target.value as any)}
+            className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-900"
+            title="Device"
+          >
+            <option value="iphone-14">iPhone 14</option>
+            <option value="iphone-15">iPhone 15</option>
+            <option value="iphone-se">iPhone SE</option>
+            <option value="ipad">iPad</option>
+            <option value="desktop">Desktop</option>
+          </select>
+
+          {/* Orientation Toggle */}
+          <button
+            onClick={() => setOrientation((o) => (o === 'portrait' ? 'landscape' : 'portrait'))}
+            className="flex items-center space-x-2 px-2 py-1 text-xs bg-gray-100 text-gray-900 rounded border border-gray-300 hover:bg-gray-200"
+            title="Toggle Orientation"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>{orientation === 'portrait' ? 'Portrait' : 'Landscape'}</span>
           </button>
           
           <button
@@ -2526,6 +2798,57 @@ export default App;`
             <Download className="w-4 h-4" />
             <span>Export</span>
           </button>
+
+          <div className="flex items-center space-x-2">
+            <select
+              value={provider}
+              onChange={(e) => setProvider(e.target.value as any)}
+              className="text-sm border border-gray-300 rounded px-2 py-1 text-gray-900"
+            >
+              <option value="local">Local</option>
+              <option value="netlify">Netlify</option>
+              <option value="vercel">Vercel</option>
+            </select>
+            <button
+              onClick={async () => {
+                if (generatedFiles.length === 0) return
+                setDeploying(true)
+                try {
+                  const files = generatedFiles
+                    .filter(f => f.type === 'file' && f.content)
+                    .map(f => ({ name: f.name, path: f.path, content: f.content!, language: f.language || 'text' }))
+
+                  // Validate + Lint
+                  const [validation, lint] = await Promise.all([
+                    validateProject(files as any),
+                    lintProject(files as any)
+                  ])
+                  if (validation.totalErrors > 0) {
+                    setGenerationMessage(`Validation failed: ${validation.totalErrors} errors`)
+                    setTimeout(() => setGenerationMessage(''), 4000)
+                    setDeploying(false)
+                    return
+                  }
+
+                  const deployRes = await deployProject(files as any, provider)
+                  const url = deployRes?.artifact?.url
+                  setGenerationMessage(url ? `Deployed artifact: ${url}` : 'Deployment completed')
+                  setTimeout(() => setGenerationMessage(''), 6000)
+                } catch (e) {
+                  console.error(e)
+                  setGenerationMessage('Deployment failed')
+                  setTimeout(() => setGenerationMessage(''), 4000)
+                } finally {
+                  setDeploying(false)
+                }
+              }}
+              disabled={generatedFiles.length === 0 || deploying}
+              className="flex items-center space-x-2 px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Globe className="w-4 h-4" />
+              <span>{deploying ? 'Deploying...' : 'Deploy'}</span>
+            </button>
+          </div>
         </div>
         
         {/* Generation Message */}
@@ -2850,49 +3173,7 @@ export default App;`
         </div>
       </div>
       
-      {/* Preview Overlay */}
-      {showPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-6xl h-full max-h-[90vh] flex flex-col">
-            {/* Preview Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <div className="flex items-center space-x-3">
-                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                <span className="ml-4 text-sm text-gray-600">CTRL Generated App Preview</span>
-              </div>
-              <button
-                onClick={closePreview}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            
-            {/* Preview Content */}
-            <div className="flex-1 relative">
-              {previewLoading ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading preview...</p>
-                  </div>
-                </div>
-              ) : (
-                <iframe
-                  src={previewUrl}
-                  className="w-full h-full border-0"
-                  title="CTRL Generated App Preview"
-                  sandbox="allow-scripts allow-same-origin"
-                />
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Simulator now opens in external popup; inline preview overlay removed */}
       
       {/* Mode Navigation Buttons - Pill Style */}
       <div className="fixed bottom-4 right-4 flex space-x-2">

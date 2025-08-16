@@ -27,8 +27,13 @@ function NavigationProvider({ children }: { children: ReactNode }) {
 
   const navigateToMode = (mode: CTRLMode) => {
     setCurrentMode(mode)
-    // Use React Router navigation
-    navigate(`/${mode}`)
+    // Preserve projectId segment if present: /:mode/:projectId
+    const match = location.pathname.match(/^\/(design|logic|code)\/(.+)$/)
+    if (match && match[2]) {
+      navigate(`/${mode}/${match[2]}`)
+    } else {
+      navigate(`/${mode}`)
+    }
   }
 
   // Update current mode when location changes

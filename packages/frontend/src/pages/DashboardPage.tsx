@@ -1,6 +1,6 @@
 import { TrendingUp, Users, Activity, Zap } from 'lucide-react'
 
-export function DashboardPage() {
+function DashboardPage() {
   const stats = [
     {
       name: 'Total Users',
@@ -120,4 +120,6 @@ export function DashboardPage() {
       </div>
     </div>
   )
-} 
+}
+
+export default DashboardPage 

@@ -1,3 +1,6 @@
+// CTRL Shared Model exports
+export * from './types/SharedModel';
+export { ModelSyncEngine } from './core/ModelSync';
 // Validation schemas
 export const userSchema = {
     email: (email) => {

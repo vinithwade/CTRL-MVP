@@ -10,9 +10,9 @@ A modern, full-stack React application with AI integration, featuring a beautifu
 - **Responsive Design**: Mobile-first approach with modern UI components
 - **Type Safety**: Full TypeScript support across frontend and backend
 - **API-First Architecture**: RESTful API with comprehensive endpoints
-- **State Management**: React Query and Zustand for efficient state handling
-- **Authentication Ready**: JWT-based authentication system
-- **Database Integration**: MongoDB with Mongoose ODM
+- **State Management**: React Context and custom hooks for efficient state handling
+- **Authentication Ready**: Supabase-based authentication system
+- **Database Integration**: Supabase with PostgreSQL
 - **File Upload**: Image and document processing capabilities
 
 ## 📁 Project Structure
@@ -23,26 +23,55 @@ CTRL_mvp/
 │   ├── frontend/          # React frontend application
 │   │   ├── src/
 │   │   │   ├── components/    # Reusable UI components
+│   │   │   │   ├── Layout.tsx         # Main layout component
+│   │   │   │   ├── AuthModal.tsx      # Authentication modal
+│   │   │   │   └── CreateProjectModal.tsx # Project creation modal
 │   │   │   ├── pages/         # Page components
-│   │   │   ├── hooks/         # Custom React hooks
-│   │   │   ├── services/      # API service functions
-│   │   │   ├── utils/         # Utility functions
-│   │   │   └── types/         # TypeScript type definitions
+│   │   │   │   ├── HomePage.tsx       # Landing page
+│   │   │   │   ├── AIPage.tsx         # AI chat interface
+│   │   │   │   ├── DashboardPage.tsx  # Main dashboard
+│   │   │   │   ├── UserDashboardPage.tsx # User-specific dashboard
+│   │   │   │   ├── ProfilePage.tsx    # User profile
+│   │   │   │   ├── SettingsPage.tsx   # Settings page
+│   │   │   │   ├── DesignMode.tsx     # Design mode interface
+│   │   │   │   ├── LogicMode.tsx      # Logic mode interface
+│   │   │   │   └── CodeMode.tsx       # Code generation mode
+│   │   │   ├── contexts/       # React contexts
+│   │   │   │   ├── NavigationContext.tsx # Navigation state
+│   │   │   │   └── DesignContext.tsx  # Design state management
+│   │   │   ├── hooks/          # Custom React hooks
+│   │   │   │   └── useAuth.ts  # Authentication hook
+│   │   │   ├── services/       # API service functions
+│   │   │   │   └── projectService.ts # Project management
+│   │   │   ├── utils/          # Utility functions
+│   │   │   ├── types/          # TypeScript type definitions
+│   │   │   ├── styles/         # CSS styles
+│   │   │   ├── assets/         # Static assets
+│   │   │   ├── App.tsx         # Main app component
+│   │   │   ├── main.tsx        # App entry point
+│   │   │   └── supabaseClient.ts # Supabase client
 │   │   └── ...
 │   ├── backend/           # Node.js/Express API server
 │   │   ├── src/
-│   │   │   ├── controllers/   # Route controllers
-│   │   │   ├── middleware/    # Express middleware
-│   │   │   ├── models/        # Database models
-│   │   │   ├── routes/        # API routes
-│   │   │   ├── services/      # Business logic services
-│   │   │   └── utils/         # Utility functions
+│   │   │   ├── routes/         # API routes
+│   │   │   │   ├── ai.ts       # AI-related endpoints
+│   │   │   │   ├── users.ts    # User management
+│   │   │   │   ├── dashboard.ts # Dashboard data
+│   │   │   │   └── settings.ts # Settings management
+│   │   │   ├── services/       # Business logic services
+│   │   │   │   └── aiService.ts # AI service integration
+│   │   │   ├── middleware/     # Express middleware
+│   │   │   │   ├── errorHandler.ts # Error handling
+│   │   │   │   └── notFound.ts # 404 handler
+│   │   │   └── index.ts        # Server entry point
 │   │   └── ...
 │   └── shared/            # Shared types and utilities
 │       └── src/
 │           └── index.ts       # Common types and utilities
-├── .env.example          # Environment variables template
-└── README.md            # This file
+├── docker/                # Docker configuration
+├── database-setup.sql     # Database schema
+├── setup-database.sh      # Database setup script
+└── README.md             # This file
 ```
 
 ## 🛠️ Tech Stack
@@ -53,20 +82,17 @@ CTRL_mvp/
 - **Vite** - Build tool and dev server
 - **Tailwind CSS** - Utility-first CSS framework
 - **React Router** - Client-side routing
-- **React Query** - Server state management
-- **Zustand** - Client state management
+- **React Context** - State management
+- **Supabase** - Backend as a Service
 - **Lucide React** - Icon library
 
 ### Backend
 - **Node.js** - Runtime environment
 - **Express** - Web framework
 - **TypeScript** - Type safety
-- **MongoDB** - Database
-- **Mongoose** - ODM
 - **Socket.io** - Real-time communication
 - **OpenAI** - AI integration
-- **JWT** - Authentication
-- **Zod** - Schema validation
+- **Supabase** - Database and authentication
 
 ### Development Tools
 - **ESLint** - Code linting
@@ -80,7 +106,7 @@ CTRL_mvp/
 
 - Node.js 18+ 
 - npm or yarn
-- PostgreSQL (for Supabase database)
+- Supabase account
 
 ### Installation
 
@@ -95,10 +121,11 @@ CTRL_mvp/
    npm run install:all
    ```
 
-3. **Set up the database**
+3. **Set up Supabase**
+   - Create a new project at [Supabase](https://supabase.com)
+   - Get your project URL and anon key
+   - Run the database setup script:
    ```bash
-   # Update database credentials in setup-database.sh
-   # Then run the setup script
    ./setup-database.sh
    ```
    
@@ -106,8 +133,22 @@ CTRL_mvp/
 
 4. **Set up environment variables**
    ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
+   # Create .env file in the root directory with the following variables:
+   PORT=5001
+   NODE_ENV=development
+   FRONTEND_URL=http://localhost:3000
+   OPENAI_API_KEY=your_openai_api_key_here
+   
+   # Frontend Supabase Configuration
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   
+   # Backend Supabase Configuration
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+   
+   JWT_SECRET=your_jwt_secret_here
+   JWT_EXPIRES_IN=7d
    ```
 
 5. **Start development servers**
@@ -115,7 +156,7 @@ CTRL_mvp/
    npm run dev
    ```
 
-This will start both frontend (http://localhost:3000) and backend (http://localhost:5000) servers.
+This will start both frontend (http://localhost:3000) and backend (http://localhost:5001) servers.
 
 ## 📖 Available Scripts
 
@@ -208,7 +249,7 @@ To enable AI features, you'll need an OpenAI API key:
 - **Automatic User Association**: New projects are automatically linked to the authenticated user
 - **Data Integrity**: Foreign key constraints and cascading deletes
 
-## �� Features Overview
+## 🎯 Features Overview
 
 ### AI Assistant
 - Real-time chat interface
@@ -230,6 +271,24 @@ To enable AI features, you'll need an OpenAI API key:
 - Notification settings
 - Theme customization
 - Data management
+
+### Design Mode
+- Visual UI builder
+- Component library
+- Real-time preview
+- Export functionality
+
+### Logic Mode
+- Flow-based programming
+- Node-based interface
+- Logic validation
+- Auto-save functionality
+
+### Code Mode
+- Generated code preview
+- Multiple language support
+- Code optimization
+- Export capabilities
 
 ## 🔌 API Endpoints
 
@@ -265,6 +324,8 @@ To enable AI features, you'll need an OpenAI API key:
 The frontend includes a comprehensive set of reusable components:
 
 - **Layout** - Main application layout with sidebar navigation
+- **AuthModal** - Authentication modal for login/signup
+- **CreateProjectModal** - Project creation interface
 - **Cards** - Content containers with consistent styling
 - **Buttons** - Primary and secondary button variants
 - **Forms** - Input fields and form controls
@@ -275,9 +336,9 @@ The frontend includes a comprehensive set of reusable components:
 
 - **Helmet** - Security headers
 - **CORS** - Cross-origin resource sharing
-- **Input Validation** - Zod schema validation
+- **Input Validation** - Request validation
 - **Rate Limiting** - API request limiting
-- **JWT Authentication** - Secure token-based auth
+- **Supabase Auth** - Secure authentication
 - **Environment Variables** - Secure configuration
 
 ## 🚀 Deployment
@@ -295,6 +356,12 @@ cd packages/backend
 npm run build
 npm start
 # Deploy to your server or cloud platform
+```
+
+### Docker Deployment
+```bash
+# Build and run with Docker Compose
+docker-compose up --build
 ```
 
 ### Environment Setup
@@ -326,7 +393,8 @@ For support and questions:
 
 ## 🔮 Roadmap
 
-- [ ] User authentication and authorization
+- [x] User authentication and authorization
+- [x] Real-time project saving
 - [ ] Real-time notifications
 - [ ] Advanced AI features (voice, image generation)
 - [ ] Mobile app (React Native)

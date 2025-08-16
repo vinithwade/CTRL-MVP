@@ -5,16 +5,23 @@ import morgan from 'morgan'
 import dotenv from 'dotenv'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
+import path from 'path'
+import fs from 'fs'
 
 // Import routes
 import aiRoutes from './routes/ai.js'
+import codeRoutes from './routes/code.js'
 import userRoutes from './routes/users.js'
 import dashboardRoutes from './routes/dashboard.js'
 import settingsRoutes from './routes/settings.js'
+import projectRoutes from './routes/projects.js'
 
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js'
 import { notFound } from './middleware/notFound.js'
+
+// Import services
+import SyncService from './services/syncService.js'
 
 // Load environment variables
 dotenv.config()
@@ -33,13 +40,9 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'development'
 
 const app = express()
 const server = createServer(app)
-const io = new Server(server, {
-  cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
-})
+
+// Initialize enhanced sync service for real-time collaboration
+const syncService = new SyncService(server)
 
 // Enhanced security middleware
 app.use(helmet({
@@ -118,74 +121,43 @@ app.get('/health', (req, res) => {
 
 // API Routes
 app.use('/api/ai', aiRoutes)
+app.use('/api/code', codeRoutes)
 app.use('/api/users', userRoutes)
 app.use('/api/dashboard', dashboardRoutes)
 app.use('/api/settings', settingsRoutes)
+app.use('/api/projects', projectRoutes)
 
-// WebSocket connection for real-time features
-io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id)
-
-  socket.on('join-room', (room) => {
-    try {
-      if (typeof room !== 'string' || room.trim().length === 0) {
-        socket.emit('error', { message: 'Invalid room name' })
-        return
-      }
-      socket.join(room)
-      console.log(`Client ${socket.id} joined room: ${room}`)
-      socket.emit('room-joined', { room })
-    } catch (error) {
-      console.error('Error joining room:', error)
-      socket.emit('error', { message: 'Failed to join room' })
-    }
-  })
-
-  socket.on('ai-query', async (data) => {
-    try {
-      // Validate data
-      if (!data || typeof data !== 'object') {
-        socket.emit('ai-error', { error: 'Invalid data format' })
-        return
-      }
-
-      // Handle AI queries in real-time
-      const response = await processAIQuery(data)
-      socket.emit('ai-response', response)
-    } catch (error) {
-      console.error('AI query error:', error)
-      socket.emit('ai-error', { 
-        error: 'Failed to process AI query',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      })
-    }
-  })
-
-  socket.on('disconnect', (reason) => {
-    console.log('Client disconnected:', socket.id, 'Reason:', reason)
-  })
-
-  socket.on('error', (error) => {
-    console.error('Socket error:', error)
-  })
-})
+// WebSocket connections are now handled by SyncService
+// Real-time bidirectional synchronization between Design, Logic, and Code modes
 
 // Error handling middleware
 app.use(notFound)
 app.use(errorHandler)
 
 // Start server
-const PORT = process.env.PORT || 5001
+const portEnv = process.env.PORT || process.env.BACKEND_PORT
+const PORT = typeof portEnv === 'string' ? parseInt(portEnv, 10) : (portEnv || 5001)
 
-const serverInstance = server.listen(PORT, () => {
+const serverInstance = server.listen(PORT as number, () => {
   console.log(`🚀 Server running on port ${PORT}`)
   console.log(`📊 Health check: http://localhost:${PORT}/health`)
   console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`)
 })
 
+// Serve deployment artifacts (zips)
+try {
+  const deploymentsDir = path.resolve(process.cwd(), 'deployments')
+  if (!fs.existsSync(deploymentsDir)) fs.mkdirSync(deploymentsDir, { recursive: true })
+  app.use('/api/code/deployments', express.static(deploymentsDir))
+  console.log(`📦 Serving deployments from ${deploymentsDir}`)
+} catch (e) {
+  console.warn('Could not initialize deployments static server:', e)
+}
+
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...')
+  syncService.cleanup()
   serverInstance.close(() => {
     console.log('Server closed')
     process.exit(0)
@@ -194,6 +166,7 @@ process.on('SIGTERM', () => {
 
 process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully...')
+  syncService.cleanup()
   serverInstance.close(() => {
     console.log('Server closed')
     process.exit(0)
@@ -203,6 +176,7 @@ process.on('SIGINT', () => {
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error)
+  syncService.cleanup()
   serverInstance.close(() => {
     console.log('Server closed due to uncaught exception')
     process.exit(1)
@@ -211,6 +185,7 @@ process.on('uncaughtException', (error) => {
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason)
+  syncService.cleanup()
   serverInstance.close(() => {
     console.log('Server closed due to unhandled rejection')
     process.exit(1)

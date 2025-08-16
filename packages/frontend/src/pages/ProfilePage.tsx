@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../supabaseClient'
 import { useNavigate } from 'react-router-dom'
 
-export function ProfilePage() {
+function ProfilePage() {
   const { user, logout } = useAuth()
   const [email, setEmail] = useState(user?.email || '')
   const [newEmail, setNewEmail] = useState('')
@@ -77,3 +77,5 @@ export function ProfilePage() {
     </div>
   )
 }
+
+export default ProfilePage

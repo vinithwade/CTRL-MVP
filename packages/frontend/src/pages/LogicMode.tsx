@@ -1,6 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigation } from '@/contexts/NavigationContext'
 import { useDesign } from '@/contexts/DesignContext'
+import { ProjectService } from '@/services/projectService'
 import { 
   Database, 
   GitBranch, 
@@ -33,7 +34,11 @@ interface Connection {
   type: 'data' | 'control' | 'style'
 }
 
-export function LogicMode() {
+interface LogicModeProps {
+  projectId?: string
+}
+
+export function LogicMode({ projectId }: LogicModeProps) {
   const { navigateToMode } = useNavigation()
   const { 
     screens, 
@@ -44,7 +49,8 @@ export function LogicMode() {
     updateLogicNode, 
     deleteLogicNode, 
     addConnection, 
-    deleteConnection 
+    deleteConnection,
+    loadLogicState
   } = useDesign()
   
   // Get components that are actually used in the design mode (from active screen)
@@ -72,6 +78,145 @@ export function LogicMode() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [sidebarVisible, setSidebarVisible] = useState(false)
   const [leftSidebarVisible, setLeftSidebarVisible] = useState(true)
+
+  const [isLoadingData, setIsLoadingData] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+
+  // Undo/redo stacks
+  type LogicSnapshot = {
+    nodes: LogicNode[]
+    connections: Connection[]
+    zoom: number
+    pan: { x: number; y: number }
+    selectedNodeId: string | null
+  }
+  const [undoStack, setUndoStack] = useState<LogicSnapshot[]>([])
+  const [redoStack, setRedoStack] = useState<LogicSnapshot[]>([])
+
+  const pushHistory = useCallback(() => {
+    const snapshot: LogicSnapshot = {
+      nodes: JSON.parse(JSON.stringify(logicNodes)),
+      connections: JSON.parse(JSON.stringify(connections)),
+      zoom,
+      pan,
+      selectedNodeId: selectedNode?.id || null
+    }
+    setUndoStack(prev => {
+      const next = [...prev, snapshot]
+      return next.length > 50 ? next.slice(next.length - 50) : next
+    })
+    setRedoStack([])
+  }, [logicNodes, connections, zoom, pan, selectedNode])
+
+  const undo = useCallback(() => {
+    setUndoStack(prev => {
+      if (prev.length === 0) return prev
+      const last = prev[prev.length - 1]
+      const rest = prev.slice(0, -1)
+      const current: LogicSnapshot = {
+        nodes: JSON.parse(JSON.stringify(logicNodes)),
+        connections: JSON.parse(JSON.stringify(connections)),
+        zoom,
+        pan,
+        selectedNodeId: selectedNode?.id || null
+      }
+      setRedoStack(r => [...r, current])
+      loadLogicState({ logicNodes: last.nodes, connections: last.connections })
+      setZoom(last.zoom)
+      setPan(last.pan)
+      setSelectedNode(last.selectedNodeId ? last.nodes.find(n => n.id === last.selectedNodeId) || null : null)
+      return rest
+    })
+  }, [logicNodes, connections, zoom, pan, selectedNode, loadLogicState])
+
+  const redo = useCallback(() => {
+    setRedoStack(prev => {
+      if (prev.length === 0) return prev
+      const last = prev[prev.length - 1]
+      const rest = prev.slice(0, -1)
+      const current: LogicSnapshot = {
+        nodes: JSON.parse(JSON.stringify(logicNodes)),
+        connections: JSON.parse(JSON.stringify(connections)),
+        zoom,
+        pan,
+        selectedNodeId: selectedNode?.id || null
+      }
+      setUndoStack(u => [...u, current])
+      loadLogicState({ logicNodes: last.nodes, connections: last.connections })
+      setZoom(last.zoom)
+      setPan(last.pan)
+      setSelectedNode(last.selectedNodeId ? last.nodes.find(n => n.id === last.selectedNodeId) || null : null)
+      return rest
+    })
+  }, [logicNodes, connections, zoom, pan, selectedNode, loadLogicState])
+
+  // Load logic state
+  const loadLogicData = useCallback(async () => {
+    if (!projectId || isLoadingData) return
+    setIsLoadingData(true)
+    try {
+      const logicData = await ProjectService.getProjectData(projectId, 'logic')
+      if (logicData?.data) {
+        const data = logicData.data
+        if (Array.isArray(data.logicNodes) && Array.isArray(data.connections)) {
+          loadLogicState({ logicNodes: data.logicNodes, connections: data.connections })
+        }
+        if (typeof data.zoom === 'number') setZoom(data.zoom)
+        if (data.pan && typeof data.pan.x === 'number' && typeof data.pan.y === 'number') setPan(data.pan)
+        if (data.selectedNodeId) {
+          const n = (data.logicNodes as LogicNode[]).find((x: LogicNode) => x.id === data.selectedNodeId) || null
+          setSelectedNode(n)
+        }
+      }
+    } catch (err) {
+      console.error('Error loading logic data:', err)
+    } finally {
+      setIsLoadingData(false)
+    }
+  }, [projectId, isLoadingData, loadLogicState])
+
+  useEffect(() => {
+    if (projectId) loadLogicData()
+  }, [projectId, loadLogicData])
+
+  const saveLogicData = useCallback(async () => {
+    if (!projectId || isLoadingData || isSaving) return
+    setIsSaving(true)
+    try {
+      const data = {
+        logicNodes,
+        connections,
+        zoom,
+        pan,
+        selectedNodeId: selectedNode?.id || null,
+        timestamp: Date.now()
+      }
+      await ProjectService.saveProjectData(projectId, 'logic', data)
+    } catch (err) {
+      console.error('Error saving logic data:', err)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [projectId, isLoadingData, isSaving, logicNodes, connections, zoom, pan, selectedNode])
+
+  // Auto-save
+  useEffect(() => {
+    if (!projectId) return
+    const i = setInterval(() => saveLogicData(), 30000)
+    return () => clearInterval(i)
+  }, [projectId, saveLogicData])
+
+  // Save on unload/visibility
+  useEffect(() => {
+    if (!projectId) return
+    const handler = () => saveLogicData()
+    window.addEventListener('visibilitychange', handler)
+    window.addEventListener('beforeunload', handler)
+    return () => {
+      window.removeEventListener('visibilitychange', handler)
+      window.removeEventListener('beforeunload', handler)
+    }
+  }, [projectId, saveLogicData])
 
   // Logic node types with better visual representation
   const nodeTypes = {
@@ -127,6 +272,7 @@ export function LogicMode() {
   }
 
   const addNode = (type: keyof typeof nodeTypes | 'component', position: { x: number; y: number }, data?: any, componentId?: string) => {
+    pushHistory()
     const newNode: LogicNode = {
       id: Date.now().toString(),
       type,
@@ -145,6 +291,7 @@ export function LogicMode() {
     const existingConnection = connections.find(conn => conn.from === from && conn.to === to)
     if (existingConnection) return
 
+    pushHistory()
     const newConnection: Connection = {
       id: Date.now().toString(),
       from,
@@ -216,6 +363,16 @@ export function LogicMode() {
       deleteNode(selectedNode.id)
       setSelectedNode(null)
       setSidebarVisible(false)
+    }
+    const isMac = navigator.platform.toLowerCase().includes('mac')
+    const ctrlOrMeta = isMac ? e.metaKey : e.ctrlKey
+    if (ctrlOrMeta && e.key.toLowerCase() === 'z') {
+      e.preventDefault()
+      if (e.shiftKey) {
+        redo()
+      } else {
+        undo()
+      }
     }
     if (e.key === 'Escape') {
       setSelectedNode(null)
