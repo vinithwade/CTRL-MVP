@@ -11,7 +11,6 @@
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
-    "shared": "file:../shared",
     "@reactflow/background": "^11.3.14",
     "@reactflow/controls": "^11.2.14",
     "@reactflow/core": "^11.11.4",
@@ -35,11 +34,13 @@
     "react-router-dom": "^6.20.1",
     "react-syntax-highlighter": "^15.6.1",
     "reactflow": "^11.11.4",
+    "shared": "file:../shared",
     "socket.io-client": "^4.8.1",
     "tailwind-merge": "^2.0.0",
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/node": "^20.9.0",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
