@@ -11,7 +11,7 @@
     "dev:frontend": "npm run dev --workspace=frontend",
     "dev:backend": "cross-env BACKEND_PORT=5002 npm run dev --workspace=backend",
     "build": "npm run build --workspaces",
-    "build:frontend": "cd packages/shared && npm run build && cd ../frontend && npm run build",
+    "build:frontend": "npm run build --workspace=shared && npm run build --workspace=frontend",
     "start": "npm run start --workspace=backend",
     "install:all": "npm install && npm install --workspace=frontend && npm install --workspace=backend"
   },
