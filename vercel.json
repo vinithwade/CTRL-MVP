@@ -5,7 +5,7 @@
       "destination": "/index.html"
     }
   ],
-  "installCommand": "npm install --workspaces",
-  "buildCommand": "npm run build --workspace=shared --if-present && npm run build --workspace=frontend",
+  "installCommand": "npm install && npm install --prefix packages/shared && npm install --prefix packages/frontend",
+  "buildCommand": "npm run build --prefix packages/shared && npm run build --prefix packages/frontend",
   "outputDirectory": "packages/frontend/dist"
 } 
