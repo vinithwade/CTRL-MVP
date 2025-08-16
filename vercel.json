@@ -5,7 +5,7 @@
       "destination": "/index.html"
     }
   ],
-  "installCommand": "npm install && cd packages/shared && npm install && cd .. && cd frontend && npm install && cd ../..",
-  "buildCommand": "cd packages/shared && npm run build && cd .. && cd frontend && npm run build && cd ../..",
+  "installCommand": "npm install && (cd packages/shared && npm install) && (cd packages/frontend && npm install)",
+  "buildCommand": "(cd packages/shared && npm run build) && (cd packages/frontend && npm run build)",
   "outputDirectory": "packages/frontend/dist"
 } 
