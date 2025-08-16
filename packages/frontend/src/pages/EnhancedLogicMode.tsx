@@ -13,6 +13,8 @@ import {
   Database,
   Zap,
   Eye,
+  Circle,
+  X,
   EyeOff,
   Save,
   Download,

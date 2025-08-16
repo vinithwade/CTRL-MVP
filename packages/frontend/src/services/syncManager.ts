@@ -79,12 +79,12 @@ export class SyncManager {
     // User collaboration events
     this.socket.on('user-joined', (data: { userId: string; mode: string }) => {
       console.log('SyncManager: User joined:', data)
-      this.config.onUserJoin(data)
+      this.config.onUserJoin({ id: data.userId, mode: data.mode })
     })
 
     this.socket.on('user-left', (data: { userId: string }) => {
       console.log('SyncManager: User left:', data)
-      this.config.onUserLeave(data)
+      this.config.onUserLeave({ id: data.userId })
     })
 
     this.socket.on('user-mode-changed', (data: { userId: string; mode: string }) => {

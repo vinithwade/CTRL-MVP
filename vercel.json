@@ -5,6 +5,7 @@
       "destination": "/index.html"
     }
   ],
-  "buildCommand": "cd packages/frontend && npm install && npm run build",
+  "installCommand": "npm install",
+  "buildCommand": "npm run build --workspace=frontend",
   "outputDirectory": "packages/frontend/dist"
 } 

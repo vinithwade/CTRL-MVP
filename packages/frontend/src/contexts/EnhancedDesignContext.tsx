@@ -251,6 +251,7 @@ export function EnhancedDesignProvider({ children, projectId, userId }: Props) {
   }
 
   const deleteScreen = (screenId: string): void => {
+    const syncEngine = syncManager?.getSyncEngine()
     if (!syncEngine) return
     
     pushToHistory()
@@ -275,6 +276,7 @@ export function EnhancedDesignProvider({ children, projectId, userId }: Props) {
 
   // Component operations
   const createComponent = (type: ComponentType, position: Position, screenId?: string): UIComponent => {
+    const syncEngine = syncManager?.getSyncEngine()
     if (!syncEngine) throw new Error('Sync engine not initialized')
     
     pushToHistory()
@@ -334,6 +336,7 @@ export function EnhancedDesignProvider({ children, projectId, userId }: Props) {
   }
 
   const updateComponent = (componentId: string, updates: Partial<UIComponent>): void => {
+    const syncEngine = syncManager?.getSyncEngine()
     if (!syncEngine) return
     
     pushToHistory()
@@ -359,6 +362,7 @@ export function EnhancedDesignProvider({ children, projectId, userId }: Props) {
   }
 
   const deleteComponent = (componentId: string): void => {
+    const syncEngine = syncManager?.getSyncEngine()
     if (!syncEngine) return
     
     pushToHistory()
@@ -390,6 +394,7 @@ export function EnhancedDesignProvider({ children, projectId, userId }: Props) {
   }
 
   const duplicateComponent = (componentId: string): UIComponent | null => {
+    const syncEngine = syncManager?.getSyncEngine()
     if (!syncEngine) return null
     
     const component = project?.components.find(c => c.id === componentId)
@@ -418,6 +423,7 @@ export function EnhancedDesignProvider({ children, projectId, userId }: Props) {
 
   // Logic operations
   const createLogicNode = (type: string, position: Position): LogicNode => {
+    const syncEngine = syncManager?.getSyncEngine()
     if (!syncEngine) throw new Error('Sync engine not initialized')
     
     const node: LogicNode = {
@@ -443,6 +449,7 @@ export function EnhancedDesignProvider({ children, projectId, userId }: Props) {
   }
 
   const updateLogicNode = (nodeId: string, updates: Partial<LogicNode>): void => {
+    const syncEngine = syncManager?.getSyncEngine()
     if (!syncEngine) return
     
     const updatedProject = { ...syncEngine.getProject() }
@@ -461,6 +468,7 @@ export function EnhancedDesignProvider({ children, projectId, userId }: Props) {
   }
 
   const deleteLogicNode = (nodeId: string): void => {
+    const syncEngine = syncManager?.getSyncEngine()
     if (!syncEngine) return
     
     const updatedProject = { ...syncEngine.getProject() }
@@ -474,6 +482,7 @@ export function EnhancedDesignProvider({ children, projectId, userId }: Props) {
   }
 
   const createConnection = (fromId: string, toId: string): LogicConnection => {
+    const syncEngine = syncManager?.getSyncEngine()
     if (!syncEngine) throw new Error('Sync engine not initialized')
     
     const connection: LogicConnection = {
@@ -496,6 +505,7 @@ export function EnhancedDesignProvider({ children, projectId, userId }: Props) {
   }
 
   const deleteConnection = (connectionId: string): void => {
+    const syncEngine = syncManager?.getSyncEngine()
     if (!syncEngine) return
     
     const updatedProject = { ...syncEngine.getProject() }
@@ -632,8 +642,8 @@ export function EnhancedDesignProvider({ children, projectId, userId }: Props) {
       backgroundColor: type === 'button' ? '#3b82f6' : '#ffffff',
       borderRadius: 4,
       border: '1px solid #d1d5db',
-      padding: { top: 8, right: 12, bottom: 8, left: 12, unit: 'px' },
-      margin: { top: 0, right: 0, bottom: 0, left: 0, unit: 'px' },
+      padding: { top: 8, right: 12, bottom: 8, left: 12, unit: 'px' as const },
+      margin: { top: 0, right: 0, bottom: 0, left: 0, unit: 'px' as const },
       opacity: 1,
       display: 'block' as const
     }

@@ -363,7 +363,10 @@ export function DesignCanvas({
           {/* Canvas */}
           <div
             ref={(node) => {
-              canvasRef.current = node
+              if (canvasRef.current !== node) {
+                // @ts-ignore
+                canvasRef.current = node
+              }
               drop(node)
             }}
             className={`relative w-full h-full ${

@@ -338,7 +338,7 @@ export function LogicCanvas({ width = 1920, height = 1080 }: LogicCanvasProps) {
             fitView
             attributionPosition="bottom-left"
           >
-            <Background variant="dots" gap={20} size={1} />
+            <Background variant={"dots" as any} gap={20} size={1} />
             <Controls />
             {showMiniMap && (
               <MiniMap

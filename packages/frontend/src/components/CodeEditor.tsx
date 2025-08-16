@@ -113,11 +113,13 @@ export function CodeEditor({
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyF, () => {
       setFindVisible(true)
-      editor.getAction('actions.find').run()
+      const findAction = editor.getAction('actions.find')
+      if (findAction) findAction.run()
     })
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF, () => {
-      editor.getAction('editor.action.formatDocument').run()
+      const formatAction = editor.getAction('editor.action.formatDocument')
+      if (formatAction) formatAction.run()
     })
   }
 
@@ -125,6 +127,13 @@ export function CodeEditor({
     // Register custom language features
     monaco.languages.registerCompletionItemProvider('typescript', {
       provideCompletionItems: (model, position) => {
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: position.column,
+          endColumn: position.column
+        }
+        
         return {
           suggestions: [
             {
@@ -132,21 +141,24 @@ export function CodeEditor({
               kind: monaco.languages.CompletionItemKind.Function,
               insertText: 'useState(${1:initialValue})',
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-              documentation: 'React useState hook'
+              documentation: 'React useState hook',
+              range: range
             },
             {
               label: 'useEffect',
               kind: monaco.languages.CompletionItemKind.Function,
               insertText: 'useEffect(() => {\n\t${1:// effect}\n\treturn () => {\n\t\t${2:// cleanup}\n\t}\n}, [${3:dependencies}])',
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-              documentation: 'React useEffect hook'
+              documentation: 'React useEffect hook',
+              range: range
             },
             {
               label: 'component',
               kind: monaco.languages.CompletionItemKind.Snippet,
               insertText: 'function ${1:ComponentName}() {\n\treturn (\n\t\t<div>\n\t\t\t${2:// content}\n\t\t</div>\n\t)\n}',
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-              documentation: 'React functional component'
+              documentation: 'React functional component',
+              range: range
             }
           ]
         }
@@ -183,7 +195,8 @@ export function CodeEditor({
               edit: {
                 edits: [{
                   resource: model.uri,
-                  edit: {
+                  versionId: model.getVersionId(),
+                  textEdit: {
                     range: marker,
                     text: '// TODO: Fix this error'
                   }
@@ -253,7 +266,8 @@ export function CodeEditor({
     if (editorRef.current) {
       setIsFormatting(true)
       try {
-        await editorRef.current.getAction('editor.action.formatDocument').run()
+        const formatAction = editorRef.current.getAction('editor.action.formatDocument')
+        if (formatAction) await formatAction.run()
       } finally {
         setIsFormatting(false)
       }
@@ -398,7 +412,7 @@ export function CodeEditor({
                 lineNumbersMinChars: 3,
                 renderWhitespace: 'selection',
                 cursorBlinking: 'blink',
-                cursorSmoothCaretAnimation: true,
+                cursorSmoothCaretAnimation: "on",
                 smoothScrolling: true,
                 mouseWheelZoom: true,
                 fontSize: 14,

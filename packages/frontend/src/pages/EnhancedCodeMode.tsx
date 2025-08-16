@@ -525,7 +525,7 @@ function EnhancedCodeModeContent({ projectId }: CodeModeProps) {
                   />
                 )}
                 {rightPanelTab === 'problems' && (
-                  <ProblemsContent problems={problems} onProblemClick={(problem) => {
+                  <ProblemsContent problems={problems} onProblemClick={(problem: any) => {
                     // Navigate to problem location
                     console.log('Navigate to problem:', problem)
                   }} />
